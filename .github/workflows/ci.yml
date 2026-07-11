@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y libasound2-dev
+      - run: rustup component add --toolchain nightly rustfmt
+      - run: cargo +nightly fmt --check
+      - run: cargo check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --examples
+      - name: Unit tests
+        run: cargo test --lib
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y libasound2-dev
+      - run: rustup toolchain install 1.78 --profile minimal
+      - run: cargo +1.78 build
+      - run: cargo +1.78 build --no-default-features
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  alsa-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y libasound2-dev
+      - name: Load ALSA sequencer
+        run: |
+          sudo modprobe snd-seq
+          sudo chmod 666 /dev/snd/seq /dev/snd/timer
+      - name: Integration tests (ALSA)
+        run: cargo test

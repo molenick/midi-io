@@ -1,0 +1,92 @@
+[package]
+name = "midi-io"
+version = "0.1.0"
+edition = "2021"
+description = "Stream and send strictly-typed MIDI messages"
+repository = "https://github.com/mo/midi-io"
+keywords = ["midi", "audio", "async", "coremidi", "alsa"]
+categories = ["multimedia::audio", "asynchronous"]
+license = "MIT OR Apache-2.0"
+rust-version = "1.78"
+include = [
+  "src/**/*.rs",
+  "examples/*.rs",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "aarch64-apple-ios",
+  "x86_64-unknown-linux-gnu",
+]
+
+[features]
+default = ["io"]
+io = [
+  "dep:futures-channel",
+  "dep:futures-util",
+  "dep:coremidi",
+  "dep:coremidi-sys",
+  "dep:core-foundation",
+  "dep:alsa",
+  "dep:libc",
+]
+tracing = ["dep:tracing"]
+
+[dependencies]
+thiserror = "2"
+futures-channel = { version = "0.3", optional = true }
+futures-util = { version = "0.3", optional = true }
+tracing = { version = "0.1", optional = true }
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+coremidi = { version = "0.9", optional = true }
+coremidi-sys = { version = "3", optional = true }
+core-foundation = { version = "0.10", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+alsa = { version = "0.10", optional = true }
+libc = { version = "0.2", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = [
+  "sync",
+  "rt",
+  "rt-multi-thread",
+  "macros",
+  "time",
+] }
+
+[[example]]
+name = "codec"
+
+[[example]]
+name = "list_ports"
+required-features = ["io"]
+
+[[example]]
+name = "send"
+required-features = ["io"]
+
+[[example]]
+name = "receive"
+required-features = ["io"]
+
+[[example]]
+name = "loopback"
+required-features = ["io"]
+
+[[example]]
+name = "monitor_ports"
+required-features = ["io"]
+
+[[example]]
+name = "virtual_destination"
+required-features = ["io"]
