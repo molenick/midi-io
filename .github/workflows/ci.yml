@@ -34,14 +34,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
 
-  alsa-integration:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get install -y libasound2-dev
-      - name: Load ALSA sequencer
-        run: |
-          sudo modprobe snd-seq
-          sudo chmod 666 /dev/snd/seq /dev/snd/timer
-      - name: Integration tests (ALSA)
-        run: cargo test
+  # Note: Can't alsa on github runners
+  # alsa-integration:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: sudo apt-get install -y libasound2-dev
+  #     - name: Load ALSA sequencer
+  #       run: |
+  #         sudo modprobe snd-seq
+  #         sudo chmod 666 /dev/snd/seq /dev/snd/timer
+  #     - name: Integration tests (ALSA)
+  #       run: cargo test
