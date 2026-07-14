@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+## 0.1.1
+
+- Disable iOS simulator test runs on ci (too slow) https://github.com/molenick/midi-io/pull/3
+- Fixed broken repo link ink Cargo.toml https://github.com/molenick/midi-io/pull/2
+- Disable simulated ALSA integration tests on ci (lack of support) https://github.com/molenick/midi-io/pull/1
+
+## 0.1.0
 
 Initial release.
 

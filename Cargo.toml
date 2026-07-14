@@ -1,6 +1,6 @@
 [package]
 name = "midi-io"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Stream and send strictly-typed MIDI messages"
 repository = "https://github.com/molenick/midi-io"
