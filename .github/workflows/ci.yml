@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get install -y libasound2-dev
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - run: rustup component add --toolchain nightly rustfmt
       - run: cargo +nightly fmt --check
       - run: cargo check
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get install -y libasound2-dev
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - run: rustup toolchain install 1.78 --profile minimal
       - run: cargo +1.78 build
       - run: cargo +1.78 build --no-default-features
@@ -39,7 +39,7 @@ jobs:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - run: sudo apt-get install -y libasound2-dev
+  #     - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
   #     - name: Load ALSA sequencer
   #       run: |
   #         sudo modprobe snd-seq
