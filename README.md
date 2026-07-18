@@ -1,5 +1,7 @@
 # midi-io
 
+[![crates.io](https://img.shields.io/crates/v/midi-io.svg)](https://crates.io/crates/midi-io)
+
 A portable library for encoding, sending, decoding and streaming MIDI
 
 ## Features
