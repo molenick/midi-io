@@ -13,8 +13,19 @@ mod alsa_backend;
 #[cfg(target_os = "linux")]
 use alsa_backend::Backend;
 
-#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "linux")))]
-compile_error!("midi-io only supports macOS, iOS, and Linux");
+#[cfg(target_arch = "wasm32")]
+#[path = "web.rs"]
+mod web_backend;
+#[cfg(target_arch = "wasm32")]
+use web_backend::Backend;
+
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "linux",
+    target_arch = "wasm32"
+)))]
+compile_error!("midi-io only supports macOS, iOS, Linux, and wasm32 (Web MIDI)");
 
 macro_rules! log_error {
     ($($arg:tt)*) => {{
@@ -26,6 +37,7 @@ macro_rules! log_error {
 }
 pub(crate) use log_error;
 
+#[cfg_attr(target_arch = "wasm32", allow(unused_macros))]
 macro_rules! log_warn {
     ($($arg:tt)*) => {{
         #[cfg(feature = "tracing")]
@@ -34,6 +46,7 @@ macro_rules! log_warn {
         let _ = format_args!($($arg)*);
     }};
 }
+#[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 pub(crate) use log_warn;
 
 trait MutexExt<T> {

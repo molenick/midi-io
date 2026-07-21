@@ -5,6 +5,7 @@ use std::ffi::CString;
 use crate::NameError;
 
 #[derive(Clone, Debug)]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) struct Name(CString);
 
 impl TryFrom<&str> for Name {
@@ -16,6 +17,7 @@ impl TryFrom<&str> for Name {
 }
 
 impl Name {
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(crate) fn as_str(&self) -> &str {
         self.0
             .to_str()

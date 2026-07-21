@@ -3,7 +3,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Instant;
 
 use futures_channel::mpsc;
 use futures_channel::oneshot;
@@ -14,6 +13,7 @@ use super::MutexExt;
 use crate::midi::stream_parser::DecodedEvent;
 use crate::name::Name;
 use crate::port::VirtualPortId;
+use crate::time::Instant;
 use crate::Destination;
 use crate::DestinationChange;
 use crate::Error;
@@ -104,6 +104,7 @@ impl StreamSenders {
         }
     }
 
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(super) fn lifecycle_error(&self, error: impl Into<Error>) {
         let mut tx = self.error.lock_unpoisoned();
         let _ = tx.try_send(Timed {
@@ -141,6 +142,7 @@ impl StreamSenders {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(super) enum Command {
     ConnectSource {
         port_id: PortId,
