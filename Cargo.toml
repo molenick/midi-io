@@ -25,6 +25,7 @@ targets = [
   "x86_64-apple-darwin",
   "aarch64-apple-ios",
   "x86_64-unknown-linux-gnu",
+  "wasm32-unknown-unknown",
 ]
 
 [features]
@@ -37,6 +38,10 @@ io = [
   "dep:core-foundation",
   "dep:alsa",
   "dep:libc",
+  "dep:wasm-bindgen",
+  "dep:wasm-bindgen-futures",
+  "dep:js-sys",
+  "dep:web-sys",
 ]
 tracing = ["dep:tracing"]
 
@@ -55,6 +60,29 @@ core-foundation = { version = "0.10", optional = true }
 alsa = { version = "0.10", optional = true }
 libc = { version = "0.2", optional = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = "1"
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+  "Navigator",
+  "Window",
+  "Performance",
+  "DomException",
+  "MidiAccess",
+  "MidiInputMap",
+  "MidiOutputMap",
+  "MidiInput",
+  "MidiOutput",
+  "MidiPort",
+  "MidiPortType",
+  "MidiPortDeviceState",
+  "MidiMessageEvent",
+  "MidiConnectionEvent",
+  "MidiOptions",
+] }
+
 [dev-dependencies]
 tokio = { version = "1", features = [
   "sync",
@@ -63,6 +91,7 @@ tokio = { version = "1", features = [
   "macros",
   "time",
 ] }
+wasm-bindgen-cli-support = "=0.2.126"
 
 [[example]]
 name = "codec"
@@ -90,3 +119,6 @@ required-features = ["io"]
 [[example]]
 name = "virtual_destination"
 required-features = ["io"]
+
+[[example]]
+name = "web_synth"

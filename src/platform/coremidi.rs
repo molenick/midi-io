@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::time::Duration;
-use std::time::Instant;
 
 use core_foundation::date::CFAbsoluteTimeGetCurrent;
 use core_foundation::runloop::kCFRunLoopDefaultMode;
@@ -42,6 +41,7 @@ use super::MutexExt;
 use crate::midi::stream_parser::DecodedEvent;
 use crate::midi::stream_parser::StreamParser;
 use crate::name::Name;
+use crate::time::Instant;
 use crate::Destination;
 use crate::DestinationChange;
 use crate::Error;

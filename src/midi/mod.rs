@@ -12,7 +12,12 @@ pub(crate) mod song_position;
 #[cfg(any(
     all(
         feature = "io",
-        any(target_os = "macos", target_os = "ios", target_os = "linux")
+        any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "linux",
+            target_arch = "wasm32"
+        )
     ),
     test
 ))]

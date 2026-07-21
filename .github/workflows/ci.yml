@@ -19,6 +19,14 @@ jobs:
       - name: Unit tests
         run: cargo test --lib
 
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo build --target wasm32-unknown-unknown
+      - run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+
   msrv:
     runs-on: ubuntu-latest
     steps:

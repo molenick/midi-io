@@ -7,7 +7,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Instant;
 
 use alsa::poll::Descriptors as _;
 use alsa::seq::Addr;
@@ -42,6 +41,7 @@ use crate::midi::sys_ex::MAX_SYSEX_BYTES;
 #[cfg(test)]
 use crate::midi::sys_ex::ORPHAN_PREFIX_BYTES;
 use crate::name::Name;
+use crate::time::Instant;
 use crate::Channel;
 use crate::CodecError;
 use crate::DataByte;

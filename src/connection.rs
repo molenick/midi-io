@@ -23,7 +23,7 @@ use crate::SysEx;
 
 #[derive(Debug, Clone)]
 pub struct Timed<T> {
-    pub timestamp: std::time::Instant,
+    pub timestamp: crate::time::Instant,
     pub payload: T,
 }
 

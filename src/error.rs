@@ -35,6 +35,8 @@ pub enum IoError {
 
     #[error("platform backend thread terminated unexpectedly")]
     BackendThreadDied,
+    #[error("backend not ready")]
+    NotReady,
     #[error("command channel full - backend thread is not processing commands")]
     BackendCommandChannelFull,
 
@@ -43,6 +45,15 @@ pub enum IoError {
 
     #[error("inbound stream overflow - {dropped} message(s) dropped")]
     InboundOverflow { dropped: usize },
+
+    #[error("unsupported on this platform")]
+    Unsupported,
+
+    #[error("MIDI access denied")]
+    PermissionDenied,
+
+    #[error("MIDI access failed: {0}")]
+    WebAccess(String),
 }
 
 #[cfg(feature = "io")]

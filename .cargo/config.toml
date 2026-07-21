@@ -1,2 +1,5 @@
 [target.aarch64-apple-ios-sim]
 runner = "scripts/ios-sim-runner.sh"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg=web_sys_unstable_apis"]

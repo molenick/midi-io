@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 
 pub(crate) mod error;
 pub(crate) mod midi;
@@ -14,6 +15,8 @@ pub(crate) mod name;
 pub(crate) mod platform;
 #[cfg(feature = "io")]
 pub(crate) mod port;
+#[cfg(feature = "io")]
+pub(crate) mod time;
 
 pub use error::Error;
 #[cfg(feature = "io")]
