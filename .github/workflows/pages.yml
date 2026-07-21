@@ -21,7 +21,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: rustup target add wasm32-unknown-unknown
       - uses: taiki-e/install-action@v2
         with:
@@ -34,8 +34,8 @@ jobs:
           wasm-bindgen --target web --out-dir dist \
             examples/web_synth_app/target/wasm32-unknown-unknown/release/web_synth_app.wasm
           cp examples/web_synth_app/index.html dist/index.html
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
