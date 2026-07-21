@@ -3,6 +3,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -56,10 +57,30 @@ use crate::Timed;
 
 const COREMIDI_KEEPALIVE_SECS: f64 = 1.0e9;
 
-#[link(name = "CoreAudio", kind = "framework")]
+#[repr(C)]
+struct MachTimebaseInfo {
+    numer: u32,
+    denom: u32,
+}
+
 extern "C" {
-    fn AudioGetCurrentHostTime() -> u64;
-    fn AudioConvertHostTimeToNanos(inHostTime: u64) -> u64;
+    fn mach_absolute_time() -> u64;
+    fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32;
+}
+
+fn current_host_time() -> u64 {
+    unsafe { mach_absolute_time() }
+}
+
+fn host_time_to_nanos(host_time: u64) -> u64 {
+    static TIMEBASE: OnceLock<(u32, u32)> = OnceLock::new();
+    let (numer, denom) = *TIMEBASE.get_or_init(|| {
+        let mut tb = MachTimebaseInfo { numer: 0, denom: 0 };
+        let ret = unsafe { mach_timebase_info(&mut tb) };
+        debug_assert_eq!(ret, 0);
+        (tb.numer, tb.denom.max(1))
+    });
+    (host_time as u128 * numer as u128 / denom as u128) as u64
 }
 
 #[derive(Clone, Copy)]
@@ -71,7 +92,7 @@ struct TimeCalibration {
 impl TimeCalibration {
     fn capture() -> Self {
         let ref_instant = Instant::now();
-        let ref_host_time = unsafe { AudioGetCurrentHostTime() };
+        let ref_host_time = current_host_time();
         Self {
             ref_host_time,
             ref_instant,
@@ -84,13 +105,13 @@ impl TimeCalibration {
         }
         if host_time >= self.ref_host_time {
             let delta_ticks = host_time - self.ref_host_time;
-            let delta_ns = unsafe { AudioConvertHostTimeToNanos(delta_ticks) };
+            let delta_ns = host_time_to_nanos(delta_ticks);
             self.ref_instant
                 .checked_add(Duration::from_nanos(delta_ns))
                 .unwrap_or(self.ref_instant)
         } else {
             let delta_ticks = self.ref_host_time - host_time;
-            let delta_ns = unsafe { AudioConvertHostTimeToNanos(delta_ticks) };
+            let delta_ns = host_time_to_nanos(delta_ticks);
             self.ref_instant
                 .checked_sub(Duration::from_nanos(delta_ns))
                 .unwrap_or(self.ref_instant)
@@ -1034,7 +1055,7 @@ mod tests {
     #[test]
     fn calibration_converts_current_time_accurately() {
         let cal = TimeCalibration::capture();
-        let ts = unsafe { AudioGetCurrentHostTime() };
+        let ts = current_host_time();
         let after = Instant::now();
         let converted = cal.to_instant(ts);
         assert!(converted >= cal.ref_instant);
