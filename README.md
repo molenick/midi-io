@@ -21,6 +21,8 @@ A portable library for encoding, sending, decoding and streaming MIDI
 
 On wasm32, only receiving is supported; sending and virtual ports return `Unsupported`, and `Client` is not `Send`. Web MIDI bindings are unstable, so builds require `RUSTFLAGS=--cfg=web_sys_unstable_apis` (set for the target in `.cargo/config.toml`).
 
+**[Live demo](https://molenick.github.io/midi-io/):** a browser synth driven by the Web MIDI backend. Needs a Chromium browser and a MIDI controller plugged in. Source: [`examples/web_synth_app`](examples/web_synth_app).
+
 If you need a platform that isn't yet supported, check out [midir](https://github.com/Boddlnagg/midir).
 
 ## Example
