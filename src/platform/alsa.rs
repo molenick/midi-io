@@ -42,7 +42,6 @@ use crate::midi::sys_ex::MAX_SYSEX_BYTES;
 #[cfg(test)]
 use crate::midi::sys_ex::ORPHAN_PREFIX_BYTES;
 use crate::name::Name;
-use crate::port::PortIdInner;
 use crate::Channel;
 use crate::CodecError;
 use crate::DataByte;
@@ -112,10 +111,7 @@ trait AlsaPort {
 impl AlsaPort for Source {
     fn from_alsa(key: AlsaPortKey, name: &str) -> Self {
         Source {
-            id: PortId(PortIdInner::Alsa {
-                client_id: key.0,
-                port_id: key.1,
-            }),
+            id: key_to_id(key),
             name: name.to_string(),
             is_virtual: key.0 >= SNDRV_SEQ_DYNAMIC_CLIENTS_BEGIN,
         }
@@ -125,10 +121,7 @@ impl AlsaPort for Source {
 impl AlsaPort for Destination {
     fn from_alsa(key: AlsaPortKey, name: &str) -> Self {
         Destination {
-            id: PortId(PortIdInner::Alsa {
-                client_id: key.0,
-                port_id: key.1,
-            }),
+            id: key_to_id(key),
             name: name.to_string(),
             is_virtual: key.0 >= SNDRV_SEQ_DYNAMIC_CLIENTS_BEGIN,
         }
@@ -966,11 +959,11 @@ fn handle_send_sysex(
 }
 
 fn port_to_key(port_id: &PortId) -> AlsaPortKey {
-    let PortIdInner::Alsa {
-        client_id,
-        port_id: pid,
-    } = port_id.0;
-    AlsaPortKey(client_id, pid)
+    AlsaPortKey((port_id.0 >> 32) as u32 as i32, port_id.0 as u32 as i32)
+}
+
+fn key_to_id(key: AlsaPortKey) -> PortId {
+    PortId(((key.0 as u32 as u64) << 32) | (key.1 as u32 as u64))
 }
 
 fn add_efd_poll(pfds: &mut Vec<libc::pollfd>, efd: i32) {
@@ -1219,6 +1212,14 @@ mod tests {
             },
             receivers,
         )
+    }
+
+    #[test]
+    fn key_round_trips_through_port_id() {
+        for (client, port) in [(0, 0), (1, 2), (-1, -1), (i32::MAX, i32::MIN), (128, 3)] {
+            let round = port_to_key(&key_to_id(AlsaPortKey(client, port)));
+            assert_eq!((round.0, round.1), (client, port));
+        }
     }
 
     #[test]

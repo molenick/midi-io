@@ -42,7 +42,6 @@ use super::MutexExt;
 use crate::midi::stream_parser::DecodedEvent;
 use crate::midi::stream_parser::StreamParser;
 use crate::name::Name;
-use crate::port::PortIdInner;
 use crate::Destination;
 use crate::DestinationChange;
 use crate::Error;
@@ -277,7 +276,7 @@ fn coremidi_dest_to_destination(dest: &CoreMidiDestination) -> Option<(i32, Dest
     let name = dest.display_name().or_else(|| dest.name())?;
     let uid = dest.unique_id()? as i32;
     let port = Destination {
-        id: PortId(PortIdInner::CoreMidi(uid)),
+        id: uid_to_id(uid),
         name,
         is_virtual: endpoint_is_virtual(uid),
     };
@@ -341,7 +340,7 @@ fn coremidi_source_to_source(source: &CoreMidiSource) -> Option<(i32, Source)> {
     let name = source.display_name().or_else(|| source.name())?;
     let uid = source.unique_id()? as i32;
     let port = Source {
-        id: PortId(PortIdInner::CoreMidi(uid)),
+        id: uid_to_id(uid),
         name,
         is_virtual: endpoint_is_virtual(uid),
     };
@@ -510,7 +509,7 @@ impl Backend {
                 while let Ok(cmd) = cmd_rx.recv() {
                     match cmd {
                         Command::Disconnect(port_id) => {
-                            let PortIdInner::CoreMidi(uid) = port_id.0;
+                            let uid = id_to_uid(&port_id);
                             connections_bg.lock_unpoisoned().remove(&uid);
                             source_streams_bg.lock_unpoisoned().remove(&uid);
                             remove_client_handlers(
@@ -520,7 +519,7 @@ impl Backend {
                             );
                         }
                         Command::ConnectSource { port_id, reply } => {
-                            let PortIdInner::CoreMidi(uid) = port_id.0;
+                            let uid = id_to_uid(&port_id);
                             let result = connect_source(
                                 uid,
                                 &connections_bg,
@@ -578,7 +577,7 @@ impl Backend {
                             let _ = reply.send(result);
                         }
                         Command::DisconnectDestination(port_id) => {
-                            let PortIdInner::CoreMidi(uid) = port_id.0;
+                            let uid = id_to_uid(&port_id);
                             destination_connections.remove(&uid);
                             disconnected_outputs_bg.lock_unpoisoned().remove(&uid);
                             remove_client_handlers(
@@ -598,7 +597,7 @@ impl Backend {
                                         {
                                             on_source_added(&global_bg.ctx, &src);
                                         }
-                                        let _ = reply.send(Ok(PortId(PortIdInner::CoreMidi(uid))));
+                                        let _ = reply.send(Ok(uid_to_id(uid)));
                                     }
                                     None => {
                                         let _ = reply.send(Err(Error::from(IoError::PortNotFound)));
@@ -639,10 +638,7 @@ impl Backend {
                                         {
                                             on_dest_added(&global_bg.ctx, &dest);
                                         }
-                                        let _ = reply.send(Ok((
-                                            PortId(PortIdInner::CoreMidi(uid)),
-                                            receivers,
-                                        )));
+                                        let _ = reply.send(Ok((uid_to_id(uid), receivers)));
                                     }
                                     None => {
                                         let _ = reply.send(Err(Error::from(IoError::PortNotFound)));
@@ -749,7 +745,7 @@ fn handle_connect_destination(
     disconnected_outputs: Arc<Mutex<std::collections::HashSet<i32>>>,
     client_id: u64,
 ) -> Result<(), Error> {
-    let PortIdInner::CoreMidi(uid) = port_id.0;
+    let uid = id_to_uid(port_id);
     if destination_connections.contains_key(&uid) {
         return Err(IoError::AlreadyConnected.into());
     }
@@ -809,7 +805,7 @@ fn resolve_output_state<'a>(
     destination_connections: &'a HashMap<i32, DestinationConnectionState>,
     disconnected_outputs: &Mutex<std::collections::HashSet<i32>>,
 ) -> Result<&'a DestinationConnectionState, Error> {
-    let PortIdInner::CoreMidi(uid) = port_id.0;
+    let uid = id_to_uid(port_id);
     if disconnected_outputs.lock_unpoisoned().contains(&uid) {
         return Err(IoError::PortDisconnected.into());
     }
@@ -970,14 +966,23 @@ fn enumerate_destinations_with_cache(
 }
 
 fn id_to_uid(id: &PortId) -> i32 {
-    match id.0 {
-        PortIdInner::CoreMidi(uid) => uid,
-    }
+    id.0 as u32 as i32
+}
+
+fn uid_to_id(uid: i32) -> PortId {
+    PortId(uid as u32 as u64)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uid_round_trips_through_port_id() {
+        for uid in [0, 1, -1, i32::MAX, i32::MIN, -42] {
+            assert_eq!(id_to_uid(&uid_to_id(uid)), uid);
+        }
+    }
 
     fn make_global_ctx() -> GlobalContext {
         GlobalContext {
@@ -993,7 +998,7 @@ mod tests {
 
     fn test_source(uid: i32) -> Source {
         Source {
-            id: PortId(PortIdInner::CoreMidi(uid)),
+            id: uid_to_id(uid),
             name: format!("Test:{uid}"),
             is_virtual: false,
         }
@@ -1001,7 +1006,7 @@ mod tests {
 
     fn test_destination(uid: i32) -> Destination {
         Destination {
-            id: PortId(PortIdInner::CoreMidi(uid)),
+            id: uid_to_id(uid),
             name: format!("Test:{uid}"),
             is_virtual: false,
         }
@@ -1205,7 +1210,7 @@ mod tests {
         let disconnected: Arc<Mutex<std::collections::HashSet<i32>>> =
             Arc::new(Mutex::new(std::collections::HashSet::from([uid])));
         let mut destination_connections: HashMap<i32, DestinationConnectionState> = HashMap::new();
-        let port_id = PortId(PortIdInner::CoreMidi(uid));
+        let port_id = uid_to_id(uid);
 
         handle_connect_destination(
             &port_id,

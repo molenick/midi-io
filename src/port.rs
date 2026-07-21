@@ -2,15 +2,7 @@
 pub struct VirtualPortId(pub(crate) u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PortId(pub(crate) PortIdInner);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum PortIdInner {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    CoreMidi(i32),
-    #[cfg(target_os = "linux")]
-    Alsa { client_id: i32, port_id: i32 },
-}
+pub struct PortId(pub(crate) u64);
 
 /// A source is a sender of MIDI messages.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
