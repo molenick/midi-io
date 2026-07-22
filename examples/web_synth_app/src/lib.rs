@@ -19,9 +19,22 @@ pub fn start() {
 pub async fn run() {
     set_started(true);
     if let Err(e) = play().await {
-        status(&e);
+        if is_firefox() {
+            status(FIREFOX_HELP);
+        } else {
+            status(&e);
+        }
         set_started(false);
     }
+}
+
+const FIREFOX_HELP: &str =
+    "Firefox web MIDI support is spotty. If your controller doesn't work restart Firefox or try Chrome.";
+
+fn is_firefox() -> bool {
+    web_sys::window()
+        .and_then(|window| window.navigator().user_agent().ok())
+        .is_some_and(|agent| agent.contains("Firefox"))
 }
 
 async fn play() -> Result<(), String> {
