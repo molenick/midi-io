@@ -19,12 +19,25 @@
         margin-top: 1.5rem;
         color: #444;
       }
+      #firefox-note {
+        margin-top: 1.5rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid #b8860b;
+        border-radius: 0.5rem;
+        background: #fdf6e3;
+        color: #665500;
+        font-size: 0.95rem;
+        text-align: left;
+      }
     </style>
   </head>
   <body>
     <h1>midi-io web synth</h1>
     <button id="start">Start</button>
-    <p id="status"></p>
+    <p id="status" role="status"></p>
+    <div id="firefox-note" hidden>
+      Firefox web MIDI support is spotty. If your controller doesn't work restart Firefox or try Chrome.
+    </div>
     <script type="module">
       import init, { run } from "./web_synth_app.js";
       await init({ module_or_path: new URL("./web_synth_app_bg.wasm", import.meta.url) });
