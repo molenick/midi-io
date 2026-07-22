@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Send MIDI on the web (wasm32) backend: destinations connect (eager `open()`) and send
-- Bump Pages actions to Node 24 versions (#11) 
+- Send MIDI on the web (wasm32) backend: destinations connect (eager `open()`) and send (https://github.com/molenick/midi-io/pull/13)
+- Bump Pages actions to Node 24 versions (https://github.com/molenick/midi-io/pull/11)
 - Initial web MIDI backend (https://github.com/molenick/midi-io/pull/10)
 - Reshape PortId into an opaque u64 handle (https://github.com/molenick/midi-io/pull/9)
 
