@@ -14,6 +14,7 @@ use web_sys::MidiConnectionEvent;
 use web_sys::MidiInput;
 use web_sys::MidiMessageEvent;
 use web_sys::MidiOptions;
+use web_sys::MidiOutput;
 use web_sys::MidiPort;
 use web_sys::MidiPortDeviceState;
 use web_sys::MidiPortType;
@@ -57,6 +58,17 @@ fn find_input(inputs: &js_sys::Map, handle: u64) -> Option<MidiInput> {
     found
 }
 
+fn find_output(outputs: &js_sys::Map, handle: u64) -> Option<MidiOutput> {
+    let mut found = None;
+    outputs.for_each(&mut |value, _key| {
+        let output: MidiOutput = value.unchecked_into();
+        if port_handle(&output.id()) == handle {
+            found = Some(output);
+        }
+    });
+    found
+}
+
 struct SourceConnection {
     input: MidiInput,
     _on_message: Closure<dyn FnMut(MidiMessageEvent)>,
@@ -68,6 +80,7 @@ struct WebState {
     destination_subs: DestinationSubscribers,
     access: Option<MidiAccess>,
     connections: HashMap<u64, SourceConnection>,
+    destinations: HashMap<u64, MidiOutput>,
     _on_statechange: Option<Closure<dyn FnMut(MidiConnectionEvent)>>,
 }
 
@@ -153,6 +166,22 @@ impl WebState {
             conn.input.set_onmidimessage(None);
         }
     }
+
+    fn send(&self, port_id: PortId, data: &[u8]) -> Result<(), Error> {
+        let Some(output) = self.destinations.get(&port_id.0) else {
+            return Err(IoError::PortDisconnected.into());
+        };
+        let array = js_sys::Uint8Array::from(data);
+        output
+            .send(array.as_ref())
+            .map_err(|e| map_web_error(e).into())
+    }
+
+    fn disconnect_destination(&mut self, port_id: PortId) {
+        if let Some(output) = self.destinations.remove(&port_id.0) {
+            let _ = output.close();
+        }
+    }
 }
 
 pub(super) struct Backend {
@@ -174,6 +203,7 @@ impl Backend {
             destination_subs,
             access: None,
             connections: HashMap::new(),
+            destinations: HashMap::new(),
             _on_statechange: None,
         }));
 
@@ -210,6 +240,9 @@ impl Backend {
         for (_, conn) in st.connections.drain() {
             conn.input.set_onmidimessage(None);
         }
+        for (_, output) in st.destinations.drain() {
+            let _ = output.close();
+        }
         st._on_statechange = None;
         st.access = None;
     }
@@ -222,20 +255,58 @@ async fn request_access() -> Result<MidiAccess, Error> {
     let promise = window
         .navigator()
         .request_midi_access_with_options(&options)
-        .map_err(map_access_error)?;
-    let value = JsFuture::from(promise).await.map_err(map_access_error)?;
+        .map_err(map_web_error)?;
+    let value = JsFuture::from(promise).await.map_err(map_web_error)?;
     Ok(value.unchecked_into::<MidiAccess>())
 }
 
-fn map_access_error(value: JsValue) -> IoError {
+fn map_web_error(value: JsValue) -> IoError {
     let Ok(exception) = value.dyn_into::<DomException>() else {
         return IoError::Unsupported;
     };
     match exception.name().as_str() {
         "SecurityError" | "NotAllowedError" => IoError::PermissionDenied,
         "NotSupportedError" => IoError::Unsupported,
-        _ => IoError::WebAccess(exception.message()),
+        "InvalidStateError" => IoError::PortDisconnected,
+        _ => IoError::Web(exception.message()),
     }
+}
+
+fn connect_destination(
+    state: &Rc<RefCell<WebState>>,
+    port_id: PortId,
+    reply: oneshot::Sender<Result<(), Error>>,
+) {
+    let handle = port_id.0;
+    let state = Rc::clone(state);
+    spawn_local(async move {
+        let output = {
+            let st = state.borrow();
+            if st.destinations.contains_key(&handle) {
+                let _ = reply.send(Err(IoError::AlreadyConnected.into()));
+                return;
+            }
+            let Some(access) = st.access.clone() else {
+                let _ = reply.send(Err(IoError::NotReady.into()));
+                return;
+            };
+            let outputs: js_sys::Map = access.outputs().unchecked_into();
+            let Some(output) = find_output(&outputs, handle) else {
+                let _ = reply.send(Err(IoError::PortNotFound.into()));
+                return;
+            };
+            output
+        };
+        match JsFuture::from(output.open()).await {
+            Ok(_) => {
+                state.borrow_mut().destinations.insert(handle, output);
+                let _ = reply.send(Ok(()));
+            }
+            Err(e) => {
+                let _ = reply.send(Err(map_web_error(e).into()));
+            }
+        }
+    });
 }
 
 fn install_statechange(state: &Rc<RefCell<WebState>>, access: &MidiAccess) {
@@ -287,6 +358,10 @@ fn handle_statechange(state: &Rc<RefCell<WebState>>, ev: MidiConnectionEvent) {
             };
             let mut guard = st.destination_subs.lock_unpoisoned();
             prune_send(&mut guard, &change);
+            drop(guard);
+            if !connected {
+                st.disconnect_destination(PortId(handle));
+            }
         }
         _ => {}
     }
@@ -319,14 +394,24 @@ fn process(state: &Rc<RefCell<WebState>>, cmd: Command) {
         Command::Disconnect(port_id) => {
             state.borrow_mut().disconnect(port_id);
         }
-        Command::ConnectDestination { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+        Command::ConnectDestination { port_id, reply } => {
+            connect_destination(state, port_id, reply);
         }
-        Command::SendMidi { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+        Command::SendMidi {
+            port_id,
+            msg,
+            reply,
+        } => {
+            let result = state.borrow().send(port_id, &msg);
+            let _ = reply.send(result);
         }
-        Command::SendSysex { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+        Command::SendSysex {
+            port_id,
+            data,
+            reply,
+        } => {
+            let result = state.borrow().send(port_id, &data);
+            let _ = reply.send(result);
         }
         Command::CreateVirtualSource { reply, .. } => {
             let _ = reply.send(Err(IoError::Unsupported.into()));
@@ -340,7 +425,9 @@ fn process(state: &Rc<RefCell<WebState>>, cmd: Command) {
         Command::SendVirtualSysex { reply, .. } => {
             let _ = reply.send(Err(IoError::Unsupported.into()));
         }
-        Command::DisconnectDestination(_) => {}
+        Command::DisconnectDestination(port_id) => {
+            state.borrow_mut().disconnect_destination(port_id);
+        }
         Command::DestroyVirtualSource(_) => {}
         Command::DestroyVirtualDestination(_) => {}
     }
