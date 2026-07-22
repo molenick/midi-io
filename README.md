@@ -17,7 +17,7 @@ A portable library for encoding, sending, decoding and streaming MIDI
 | macOS  10.15+| CoreMIDI | [coremidi](https://crates.io/crates/coremidi) |
 | iOS 15+ | CoreMIDI | [coremidi](https://crates.io/crates/coremidi) |
 | Linux 3.x+ | ALSA sequencer | [alsa](https://crates.io/crates/alsa) |
-| Web (wasm32) | Web MIDI | [web-sys](https://crates.io/crates/web-sys) |
+| Web (wasm32) | Web MIDI | Chrome, Firefox (limited) |
 
 On wasm32, only receiving is supported; sending and virtual ports return `Unsupported`, and `Client` is not `Send`. Web MIDI bindings are unstable, so builds require `RUSTFLAGS=--cfg=web_sys_unstable_apis` (set for the target in `.cargo/config.toml`).
 
