@@ -52,8 +52,8 @@ pub enum IoError {
     #[error("MIDI access denied")]
     PermissionDenied,
 
-    #[error("MIDI access failed: {0}")]
-    WebAccess(String),
+    #[error("MIDI error: {0}")]
+    Web(String),
 }
 
 #[cfg(feature = "io")]
