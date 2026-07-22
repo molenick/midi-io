@@ -12,6 +12,9 @@ use web_sys::OscillatorType;
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
+    if is_firefox() {
+        reveal("firefox-note");
+    }
     status("Click Start, then play your MIDI controller.");
 }
 
@@ -22,6 +25,12 @@ pub async fn run() {
         status(&e);
         set_started(false);
     }
+}
+
+fn is_firefox() -> bool {
+    web_sys::window()
+        .and_then(|window| window.navigator().user_agent().ok())
+        .is_some_and(|agent| agent.contains("Firefox"))
 }
 
 async fn play() -> Result<(), String> {
@@ -139,5 +148,14 @@ fn set_started(started: bool) {
         } else {
             let _ = element.remove_attribute("disabled");
         }
+    }
+}
+
+fn reveal(id: &str) {
+    if let Some(element) = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.get_element_by_id(id))
+    {
+        let _ = element.remove_attribute("hidden");
     }
 }

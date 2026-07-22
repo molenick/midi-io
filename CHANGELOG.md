@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Bump Pages actions to Node 24 versions (#11) 
+- Initial web MIDI backend (https://github.com/molenick/midi-io/pull/10)
+- Reshape PortId into an opaque u64 handle (https://github.com/molenick/midi-io/pull/9)
+
 ## 0.1.2
 
 - Use mach primitives for host time on Apple platforms https://github.com/molenick/midi-io/pull/7
