@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add `PortId::to_bits`, so a port can be stored and matched in a later session
 - Send MIDI on the web (wasm32) backend: destinations connect (eager `open()`) and send (https://github.com/molenick/midi-io/pull/13)
 - Bump Pages actions to Node 24 versions (https://github.com/molenick/midi-io/pull/11)
 - Initial web MIDI backend (https://github.com/molenick/midi-io/pull/10)

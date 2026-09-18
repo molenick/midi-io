@@ -4,6 +4,24 @@ pub struct VirtualPortId(pub(crate) u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PortId(pub(crate) u64);
 
+impl PortId {
+    /// The raw port identifier. Can be used to distinguish identically-named ports.
+    /// The handle's raw value, for storing a reference to a port and matching
+    /// it against [`Source::id`] or [`Destination::id`] in a later session.
+    ///
+    /// How long the value names the same port depends on the backend:
+    ///
+    /// - CoreMIDI: the endpoint's `kMIDIPropertyUniqueID`, which the system
+    ///   persists across launches.
+    /// - ALSA: `(client_id << 32) | port_id`; the kernel assigns client numbers
+    ///   at registration, so the value can change when a device is reconnected.
+    /// - Web MIDI: a hash of the browser's `MIDIPort.id`, as stable as the
+    ///   browser keeps that id.
+    pub fn to_bits(self) -> u64 {
+        self.0
+    }
+}
+
 /// A source is a sender of MIDI messages.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Source {

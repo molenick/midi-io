@@ -984,6 +984,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn to_bits_carries_the_uid() {
+        for uid in [0, 1, -1, i32::MAX, i32::MIN, -42] {
+            assert_eq!(uid_to_id(uid).to_bits(), uid as u32 as u64);
+        }
+        assert_ne!(uid_to_id(7).to_bits(), uid_to_id(8).to_bits());
+    }
+
     fn make_global_ctx() -> GlobalContext {
         GlobalContext {
             senders: Arc::new(Mutex::new(HashMap::new())),
