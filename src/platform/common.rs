@@ -177,6 +177,7 @@ pub(super) enum Command {
     CreateVirtualDestination {
         id: VirtualPortId,
         name: Name,
+        unique_id: Option<u32>,
         reply: oneshot::Sender<Result<(PortId, StreamReceivers), Error>>,
     },
     SendVirtualMidi {
@@ -329,9 +330,15 @@ impl PlatformClient {
         &self,
         id: VirtualPortId,
         name: Name,
+        unique_id: Option<u32>,
     ) -> Result<(PortId, StreamReceivers), Error> {
-        self.request(|reply| Command::CreateVirtualDestination { id, name, reply })
-            .await
+        self.request(|reply| Command::CreateVirtualDestination {
+            id,
+            name,
+            unique_id,
+            reply,
+        })
+        .await
     }
 
     pub(crate) async fn connect_source(&self, port: &Source) -> Result<StreamReceivers, Error> {

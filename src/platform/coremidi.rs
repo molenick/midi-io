@@ -17,6 +17,7 @@ use coremidi::InputPort as CoreMidiInputPort;
 use coremidi::Notification;
 use coremidi::OutputPort as CoreMidiOutputPort;
 use coremidi::PacketBuffer;
+use coremidi::PropertySetter;
 use coremidi::Source as CoreMidiSource;
 use coremidi::VirtualDestination as CoreMidiVirtualDestination;
 use coremidi::VirtualSource as CoreMidiVirtualSource;
@@ -306,6 +307,36 @@ fn on_dest_added(ctx: &GlobalContext, dest: &CoreMidiDestination) {
         cache.insert(uid, (dest.clone(), port.clone()));
     }
     ctx.notify_destination_subscribers(DestinationChange::Added(port));
+}
+
+fn choose_unique_id(
+    ctx: &GlobalContext,
+    vdest: &CoreMidiVirtualDestination,
+    wanted: Option<u32>,
+) -> Result<Option<i32>, Error> {
+    let assigned = vdest.unique_id().map(|uid| uid as i32);
+    let Some(wanted) = wanted.map(|uid| uid as i32) else {
+        return Ok(assigned);
+    };
+    if assigned == Some(wanted) {
+        return Ok(assigned);
+    }
+    coremidi::Properties::unique_id()
+        .set_value(vdest, wanted)
+        .map_err(|status| {
+            Error::from(if status == coremidi_sys::kMIDIIDNotUnique {
+                IoError::UniqueIdTaken
+            } else {
+                IoError::Platform(PlatformError::VirtualPortCreate(status))
+            })
+        })?;
+    if let Some(stale) = assigned {
+        let removed = ctx.dest_cache.lock_unpoisoned().remove(&stale);
+        if let Some((_, port)) = removed {
+            ctx.notify_destination_subscribers(DestinationChange::Removed(port));
+        }
+    }
+    Ok(vdest.unique_id().map(|uid| uid as i32))
 }
 
 fn on_dest_removed(ctx: &GlobalContext, dest: &CoreMidiDestination) {
@@ -613,7 +644,12 @@ impl Backend {
                         Command::DestroyVirtualSource(id) => {
                             virtual_sources.remove(&id.0);
                         }
-                        Command::CreateVirtualDestination { id, name, reply } => {
+                        Command::CreateVirtualDestination {
+                            id,
+                            name,
+                            unique_id,
+                            reply,
+                        } => {
                             let (senders, receivers) = StreamSenders::channel();
 
                             let notify_senders = senders.clone();
@@ -629,21 +665,30 @@ impl Backend {
                                     });
                                 }
                             }) {
-                                Ok(vdest) => match vdest.unique_id().map(|uid| uid as i32) {
-                                    Some(uid) => {
-                                        virtual_destinations.insert(id.0, (vdest, notify_senders));
-                                        if let Some(dest) = coremidi::Destinations
-                                            .into_iter()
-                                            .find(|d| d.unique_id().map(|u| u as i32) == Some(uid))
-                                        {
-                                            on_dest_added(&global_bg.ctx, &dest);
+                                Ok(vdest) => {
+                                    match choose_unique_id(&global_bg.ctx, &vdest, unique_id) {
+                                        Ok(Some(uid)) => {
+                                            virtual_destinations
+                                                .insert(id.0, (vdest, notify_senders));
+                                            if let Some(dest) =
+                                                coremidi::Destinations.into_iter().find(|d| {
+                                                    d.unique_id().map(|u| u as i32) == Some(uid)
+                                                })
+                                            {
+                                                on_dest_added(&global_bg.ctx, &dest);
+                                            }
+                                            let _ = reply.send(Ok((uid_to_id(uid), receivers)));
                                         }
-                                        let _ = reply.send(Ok((uid_to_id(uid), receivers)));
+                                        Ok(None) => {
+                                            let _ =
+                                                reply.send(Err(Error::from(IoError::PortNotFound)));
+                                        }
+                                        Err(e) => {
+                                            drop(vdest);
+                                            let _ = reply.send(Err(e));
+                                        }
                                     }
-                                    None => {
-                                        let _ = reply.send(Err(Error::from(IoError::PortNotFound)));
-                                    }
-                                },
+                                }
                                 Err(status) => {
                                     let _ = reply.send(Err(Error::from(IoError::Platform(
                                         PlatformError::VirtualPortCreate(status),
