@@ -49,6 +49,9 @@ pub enum IoError {
     #[error("unsupported on this platform")]
     Unsupported,
 
+    #[error("another endpoint already holds that unique ID")]
+    UniqueIdTaken,
+
     #[error("MIDI access denied")]
     PermissionDenied,
 

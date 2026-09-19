@@ -500,31 +500,41 @@ impl PortRegistry {
                         }
                     }
                 }
-                Command::CreateVirtualDestination { id, name, reply } => {
-                    match create_virtual_destination_port(ctx, name.as_c_str()) {
-                        Ok(alsa_port) => {
-                            let key = AlsaPortKey(ctx.our_client, alsa_port);
-                            let destination = Destination::from_alsa(key, name.as_str());
-                            let port = destination.id;
-                            self.add_destination(key, destination);
-                            let (senders, receivers) = StreamSenders::channel();
-                            self.vdest_recv.insert(
-                                alsa_port,
-                                VirtualDestinationState {
-                                    senders,
-                                    parser: StreamParser::new(),
-                                },
-                            );
-                            self.vdest_ports.insert(id.0, alsa_port);
-                            let _ = reply.send(Ok((port, receivers)));
-                        }
-                        Err(e) => {
-                            let _ = reply.send(Err(Error::from(IoError::Platform(
-                                PlatformError::VirtualPortCreate(e.errno()),
-                            ))));
-                        }
-                    }
+                Command::CreateVirtualDestination {
+                    unique_id: Some(_),
+                    reply,
+                    ..
+                } => {
+                    let _ = reply.send(Err(IoError::Unsupported.into()));
                 }
+                Command::CreateVirtualDestination {
+                    id,
+                    name,
+                    unique_id: None,
+                    reply,
+                } => match create_virtual_destination_port(ctx, name.as_c_str()) {
+                    Ok(alsa_port) => {
+                        let key = AlsaPortKey(ctx.our_client, alsa_port);
+                        let destination = Destination::from_alsa(key, name.as_str());
+                        let port = destination.id;
+                        self.add_destination(key, destination);
+                        let (senders, receivers) = StreamSenders::channel();
+                        self.vdest_recv.insert(
+                            alsa_port,
+                            VirtualDestinationState {
+                                senders,
+                                parser: StreamParser::new(),
+                            },
+                        );
+                        self.vdest_ports.insert(id.0, alsa_port);
+                        let _ = reply.send(Ok((port, receivers)));
+                    }
+                    Err(e) => {
+                        let _ = reply.send(Err(Error::from(IoError::Platform(
+                            PlatformError::VirtualPortCreate(e.errno()),
+                        ))));
+                    }
+                },
                 Command::SendVirtualMidi { id, msg, reply } => {
                     let result = send_virtual_midi(
                         id.0,

@@ -97,10 +97,40 @@ impl Client {
         &self,
         name: &str,
     ) -> Result<VirtualDestination, Error> {
+        self.virtual_destination(name, None).await
+    }
+
+    /// Creates a virtual destination that other clients see under `unique_id`.
+    ///
+    /// CoreMIDI assigns a virtual endpoint a fresh unique ID each time it is
+    /// created, so a client that stored the ID loses the port on the next
+    /// launch. Passing the ID the port had last time keeps it the same port.
+    /// The returned destination's [`PortId::to_bits`] equals `unique_id`.
+    ///
+    /// Fails with [`IoError::UniqueIdTaken`] when another endpoint holds the ID.
+    /// Only CoreMIDI can choose an ID; other backends return
+    /// [`IoError::Unsupported`].
+    ///
+    /// [`PortId::to_bits`]: crate::PortId::to_bits
+    pub async fn create_virtual_destination_with_id(
+        &self,
+        name: &str,
+        unique_id: u32,
+    ) -> Result<VirtualDestination, Error> {
+        self.virtual_destination(name, Some(unique_id)).await
+    }
+
+    async fn virtual_destination(
+        &self,
+        name: &str,
+        unique_id: Option<u32>,
+    ) -> Result<VirtualDestination, Error> {
         let validated = Name::try_from(name).map_err(IoError::from)?;
         let id = self.inner.alloc_virtual_id();
-        let (port, (msg_rx, sx_rx, err_rx)) =
-            self.inner.create_virtual_destination(id, validated).await?;
+        let (port, (msg_rx, sx_rx, err_rx)) = self
+            .inner
+            .create_virtual_destination(id, validated, unique_id)
+            .await?;
         Ok(VirtualDestination::new(
             msg_rx,
             sx_rx,
