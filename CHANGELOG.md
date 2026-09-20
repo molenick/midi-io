@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Actually send to ALSA destinations
+
 ## 0.2.0
 
 - Export `Instant`, so the type of `Timed::timestamp` can be named on every platform
