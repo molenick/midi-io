@@ -16,7 +16,7 @@ pub(crate) mod platform;
 #[cfg(feature = "io")]
 pub(crate) mod port;
 #[cfg(feature = "io")]
-pub(crate) mod time;
+pub mod time;
 
 pub use error::Error;
 #[cfg(feature = "io")]
@@ -58,4 +58,5 @@ mod io {
     pub use crate::port::PortId;
     pub use crate::port::Source;
     pub use crate::port::SourceChange;
+    pub use crate::time::Instant;
 }
