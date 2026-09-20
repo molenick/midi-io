@@ -469,7 +469,18 @@ impl PortRegistry {
                 }
                 Command::DisconnectDestination(port_id) => {
                     let key = port_to_key(&port_id);
-                    self.destination_connections.remove(&key);
+                    if self.destination_connections.remove(&key).is_some() {
+                        let _ = ctx.seq.unsubscribe_port(
+                            Addr {
+                                client: ctx.our_client,
+                                port: ctx.our_send_port,
+                            },
+                            Addr {
+                                client: key.0,
+                                port: key.1,
+                            },
+                        );
+                    }
                 }
                 Command::CreateVirtualSource { id, name, reply } => {
                     match ctx.seq.create_simple_port(
@@ -702,6 +713,7 @@ impl PortRegistry {
         if !pinfo.get_capability().contains(ctx.destination_caps) {
             return Err(IoError::PortNotFound.into());
         }
+        subscribe_destination(ctx, key)?;
         self.destination_connections.insert(
             key,
             DestinationConnectionState {
@@ -768,6 +780,23 @@ impl PortRegistry {
         );
         Ok(receivers)
     }
+}
+
+fn subscribe_destination(ctx: &SeqContext, key: AlsaPortKey) -> Result<(), Error> {
+    let sub = PortSubscribe::empty()
+        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+    sub.set_sender(Addr {
+        client: ctx.our_client,
+        port: ctx.our_send_port,
+    });
+    sub.set_dest(Addr {
+        client: key.0,
+        port: key.1,
+    });
+    ctx.seq
+        .subscribe_port(&sub)
+        .map_err(|e| IoError::Platform(PlatformError::Connect(e.errno())))?;
+    Ok(())
 }
 
 fn handle_sysex_data(data: &[u8], conn: &mut ConnectionState, timestamp: Instant) {
