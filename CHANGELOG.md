@@ -7,12 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Add `Client::create_virtual_destination_with_id`, so a virtual destination keeps its unique ID across launches
-- Add `PortId::to_bits`, so a port can be stored and matched in a later session
+## 0.2.0
+
+- Export `Instant`, so the type of `Timed::timestamp` can be named on every platform
+- Add `Client::create_virtual_destination_with_id`, so a virtual destination keeps its unique ID across launches (https://github.com/molenick/midi-io/pull/15)
+- Add `PortId::to_bits`, so a port can be stored and matched in a later session (https://github.com/molenick/midi-io/pull/14)
 - Send MIDI on the web (wasm32) backend: destinations connect (eager `open()`) and send (https://github.com/molenick/midi-io/pull/13)
+- Warn Firefox users in the web synth example (https://github.com/molenick/midi-io/pull/12)
 - Bump Pages actions to Node 24 versions (https://github.com/molenick/midi-io/pull/11)
 - Initial web MIDI backend (https://github.com/molenick/midi-io/pull/10)
-- Reshape PortId into an opaque u64 handle (https://github.com/molenick/midi-io/pull/9)
+- Reshape `PortId` into an opaque u64 handle (https://github.com/molenick/midi-io/pull/9)
 
 ## 0.1.2
 
