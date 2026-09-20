@@ -5,7 +5,6 @@ pub struct VirtualPortId(pub(crate) u64);
 pub struct PortId(pub(crate) u64);
 
 impl PortId {
-    /// The raw port identifier. Can be used to distinguish identically-named ports.
     /// The handle's raw value, for storing a reference to a port and matching
     /// it against [`Source::id`] or [`Destination::id`] in a later session.
     ///
