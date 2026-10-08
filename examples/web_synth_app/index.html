@@ -4,44 +4,42 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>midi-io web synth</title>
-    <style>
-      body {
-        font-family: system-ui, sans-serif;
-        margin: 4rem auto;
-        max-width: 30rem;
-        text-align: center;
-      }
-      button {
-        font-size: 1.25rem;
-        padding: 0.75rem 2rem;
-      }
-      #status {
-        margin-top: 1.5rem;
-        color: #444;
-      }
-      #firefox-note {
-        margin-top: 1.5rem;
-        padding: 0.75rem 1rem;
-        border: 1px solid #b8860b;
-        border-radius: 0.5rem;
-        background: #fdf6e3;
-        color: #665500;
-        font-size: 0.95rem;
-        text-align: left;
-      }
-    </style>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <h1>midi-io web synth</h1>
-    <button id="start">Start</button>
-    <p id="status" role="status"></p>
-    <div id="firefox-note" hidden>
-      Firefox web MIDI support is spotty. If your controller doesn't work restart Firefox or try Chrome.
+    <div id="unsupported" role="alert" hidden>
+      This browser doesn't support Web MIDI. Try Chrome or Firefox.
+    </div>
+    <div id="app">
+      <button id="enable-sound">Enable sound</button>
+      <p id="status" role="status"></p>
+      <div class="note" role="note">
+        <p>WebMIDI is bleeding edge and not well-supported everywhere yet. When problems occur try restarting your browser.</p>
+        <p>Firefox: Things like "port enumeration" only happen once when the browser first runs - so a restart fixes this.</p>
+      </div>
+      <div id="log" role="region" aria-label="MIDI log" tabindex="0"></div>
+      <div id="support">
+        <h2>Browser Support Status</h2>
+        <table>
+          <thead>
+            <tr><th scope="col">Status</th><th scope="col">Feature</th><th scope="col">Detail</th></tr>
+          </thead>
+          <tbody>
+            <tr id="support-api"><td></td><td>Web MIDI</td><td></td></tr>
+            <tr id="support-permission"><td></td><td>Permission</td><td></td></tr>
+            <tr id="support-sources"><td></td><td>Sources</td><td></td></tr>
+            <tr id="support-destinations"><td></td><td>Destinations</td><td></td></tr>
+            <tr id="support-receiving"><td></td><td>Receiving</td><td></td></tr>
+            <tr id="support-sound"><td></td><td>Sound</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <script type="module">
-      import init, { run } from "./web_synth_app.js";
+      import init, { enable_sound } from "./web_synth_app.js";
       await init({ module_or_path: new URL("./web_synth_app_bg.wasm", import.meta.url) });
-      document.getElementById("start").addEventListener("click", () => run());
+      document.getElementById("enable-sound").addEventListener("click", () => enable_sound());
     </script>
   </body>
 </html>

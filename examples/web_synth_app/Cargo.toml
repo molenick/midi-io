@@ -13,15 +13,18 @@ crate-type = ["cdylib"]
 midi-io = { path = "../..", features = ["io"] }
 wasm-bindgen = "=0.2.126"
 wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
 futures-util = "0.3"
 console_error_panic_hook = "0.1"
 web-sys = { version = "0.3", features = [
   "Document",
+  "DomTokenList",
   "Element",
   "HtmlElement",
   "Navigator",
   "Window",
   "AudioContext",
+  "AudioContextState",
   "AudioDestinationNode",
   "AudioNode",
   "AudioParam",

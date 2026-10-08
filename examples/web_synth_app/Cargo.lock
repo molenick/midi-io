@@ -162,7 +162,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "midi-io"
-version = "0.1.2"
+version = "0.2.1"
 dependencies = [
  "alsa",
  "core-foundation",
@@ -371,6 +371,7 @@ version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
  "futures-util",
+ "js-sys",
  "midi-io",
  "wasm-bindgen",
  "wasm-bindgen-futures",
