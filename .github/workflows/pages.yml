@@ -34,6 +34,7 @@ jobs:
           wasm-bindgen --target web --out-dir dist \
             examples/web_synth_app/target/wasm32-unknown-unknown/release/web_synth_app.wasm
           cp examples/web_synth_app/index.html dist/index.html
+          cp examples/web_synth_app/style.css dist/style.css
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

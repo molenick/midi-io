@@ -31,8 +31,9 @@ fn run() -> Result<(), String> {
         .generate(&pkg_dir)
         .map_err(|e| e.to_string())?;
 
-    fs::copy(crate_dir.join("index.html"), pkg_dir.join("index.html"))
-        .map_err(|e| e.to_string())?;
+    for file in ["index.html", "style.css"] {
+        fs::copy(crate_dir.join(file), pkg_dir.join(file)).map_err(|e| e.to_string())?;
+    }
 
     serve(&pkg_dir)
 }
@@ -113,6 +114,8 @@ fn respond(stream: &mut TcpStream, status: &str, mime: &str, body: &[u8]) -> std
 fn content_type(path: &str) -> &'static str {
     if path.ends_with(".html") {
         "text/html; charset=utf-8"
+    } else if path.ends_with(".css") {
+        "text/css; charset=utf-8"
     } else if path.ends_with(".js") {
         "text/javascript"
     } else if path.ends_with(".wasm") {
