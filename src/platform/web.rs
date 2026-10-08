@@ -37,6 +37,7 @@ use crate::IoError;
 use crate::PortId;
 use crate::Source;
 use crate::SourceChange;
+use crate::WebError;
 
 fn port_handle(js_id: &str) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -268,7 +269,13 @@ fn map_web_error(value: JsValue) -> IoError {
         "SecurityError" | "NotAllowedError" => IoError::PermissionDenied,
         "NotSupportedError" => IoError::Unsupported,
         "InvalidStateError" => IoError::PortDisconnected,
-        _ => IoError::Web(exception.message()),
+        _ => IoError::Platform(
+            WebError {
+                name: exception.name(),
+                message: exception.message(),
+            }
+            .into(),
+        ),
     }
 }
 

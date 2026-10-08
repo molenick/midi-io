@@ -35,6 +35,8 @@ pub enum IoError {
 
     #[error("platform backend thread terminated unexpectedly")]
     BackendThreadDied,
+    #[error("IO thread initialization failed")]
+    ThreadInit,
     #[error("backend not ready")]
     NotReady,
     #[error("command channel full - backend thread is not processing commands")]
@@ -42,6 +44,9 @@ pub enum IoError {
 
     #[error(transparent)]
     Platform(#[from] PlatformError),
+
+    #[error("MIDI encoder produced no event")]
+    Encode,
 
     #[error("inbound stream overflow - {dropped} message(s) dropped")]
     InboundOverflow { dropped: usize },
@@ -54,27 +59,104 @@ pub enum IoError {
 
     #[error("MIDI access denied")]
     PermissionDenied,
-
-    #[error("MIDI error: {0}")]
-    Web(String),
 }
 
 #[cfg(feature = "io")]
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum PlatformError {
-    #[error("client initialization failed: backend error code {0}")]
-    ClientInit(i32),
-    #[error("client initialization failed: IO thread initialization failed")]
-    ThreadInit,
-    #[error("connect failed: backend error code {0}")]
-    Connect(i32),
-    #[error("send failed: backend error code {0}")]
-    Send(i32),
-    #[error("send failed: MIDI encoder produced no event for valid input")]
-    Encode,
-    #[error("virtual port creation failed: backend error code {0}")]
-    VirtualPortCreate(i32),
+    #[cfg(target_os = "linux")]
+    #[error(transparent)]
+    Alsa(#[from] AlsaError),
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[error(transparent)]
+    CoreMidi(#[from] CoreMidiError),
+
+    #[cfg(target_arch = "wasm32")]
+    #[error(transparent)]
+    Web(#[from] WebError),
+}
+
+#[cfg(all(feature = "io", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[error(transparent)]
+pub struct AlsaError(#[from] pub alsa::Error);
+
+#[cfg(all(feature = "io", target_os = "linux"))]
+impl Eq for AlsaError {}
+
+#[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CoreMidiError {
+    #[error("kMIDIInvalidClient")]
+    InvalidClient,
+    #[error("kMIDIInvalidPort")]
+    InvalidPort,
+    #[error("kMIDIWrongEndpointType")]
+    WrongEndpointType,
+    #[error("kMIDINoConnection")]
+    NoConnection,
+    #[error("kMIDIUnknownEndpoint")]
+    UnknownEndpoint,
+    #[error("kMIDIUnknownProperty")]
+    UnknownProperty,
+    #[error("kMIDIWrongPropertyType")]
+    WrongPropertyType,
+    #[error("kMIDINoCurrentSetup")]
+    NoCurrentSetup,
+    #[error("kMIDIMessageSendErr")]
+    MessageSendErr,
+    #[error("kMIDIServerStartErr")]
+    ServerStartErr,
+    #[error("kMIDISetupFormatErr")]
+    SetupFormatErr,
+    #[error("kMIDIWrongThread")]
+    WrongThread,
+    #[error("kMIDIObjectNotFound")]
+    ObjectNotFound,
+    #[error("kMIDIIDNotUnique")]
+    IdNotUnique,
+    #[error("kMIDINotPermitted")]
+    NotPermitted,
+    #[error("kMIDIUnknownError")]
+    UnknownError,
+    #[error("OSStatus {0}")]
+    Other(coremidi_sys::OSStatus),
+}
+
+#[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+impl From<coremidi_sys::OSStatus> for CoreMidiError {
+    fn from(status: coremidi_sys::OSStatus) -> Self {
+        match status {
+            coremidi_sys::kMIDIInvalidClient => Self::InvalidClient,
+            coremidi_sys::kMIDIInvalidPort => Self::InvalidPort,
+            coremidi_sys::kMIDIWrongEndpointType => Self::WrongEndpointType,
+            coremidi_sys::kMIDINoConnection => Self::NoConnection,
+            coremidi_sys::kMIDIUnknownEndpoint => Self::UnknownEndpoint,
+            coremidi_sys::kMIDIUnknownProperty => Self::UnknownProperty,
+            coremidi_sys::kMIDIWrongPropertyType => Self::WrongPropertyType,
+            coremidi_sys::kMIDINoCurrentSetup => Self::NoCurrentSetup,
+            coremidi_sys::kMIDIMessageSendErr => Self::MessageSendErr,
+            coremidi_sys::kMIDIServerStartErr => Self::ServerStartErr,
+            coremidi_sys::kMIDISetupFormatErr => Self::SetupFormatErr,
+            coremidi_sys::kMIDIWrongThread => Self::WrongThread,
+            coremidi_sys::kMIDIObjectNotFound => Self::ObjectNotFound,
+            coremidi_sys::kMIDIIDNotUnique => Self::IdNotUnique,
+            coremidi_sys::kMIDINotPermitted => Self::NotPermitted,
+            coremidi_sys::kMIDIUnknownError => Self::UnknownError,
+            other => Self::Other(other),
+        }
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{name}: {message}")]
+pub struct WebError {
+    pub name: String,
+    pub message: String,
 }
 
 #[cfg(feature = "io")]
@@ -123,10 +205,31 @@ mod tests {
             let e2: Error = IoError::InvalidName(NameError::ContainsNul(nul_error())).into();
             assert_eq!(e1.clone(), e2);
 
-            let c1: Error = IoError::Platform(PlatformError::Send(-1)).into();
-            let c2: Error = IoError::Platform(PlatformError::Send(-1)).into();
+            let c1: Error = IoError::Platform(CoreMidiError::from(-1).into()).into();
+            let c2: Error = IoError::Platform(CoreMidiError::from(-1).into()).into();
             assert_eq!(c1.clone(), c2);
         }
+    }
+
+    #[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+    #[test]
+    fn coremidi_error_from_status() {
+        let known = CoreMidiError::from(coremidi_sys::kMIDINoConnection);
+        assert_eq!(known, CoreMidiError::NoConnection);
+        assert_eq!(format!("{known}"), "kMIDINoConnection");
+        let other = CoreMidiError::from(-50);
+        assert_eq!(other, CoreMidiError::Other(-50));
+        assert_eq!(format!("{other}"), "OSStatus -50");
+    }
+
+    #[cfg(all(feature = "io", target_os = "linux"))]
+    #[test]
+    fn alsa_error_display_and_eq() {
+        let inner = alsa::Error::new("snd_seq_open", libc::ENOENT);
+        let e1: Error = IoError::Platform(AlsaError(inner).into()).into();
+        let e2: Error = IoError::Platform(AlsaError(inner).into()).into();
+        assert_eq!(e1.clone(), e2);
+        assert_eq!(format!("{e1}"), format!("{inner}"));
     }
 
     #[cfg(feature = "io")]

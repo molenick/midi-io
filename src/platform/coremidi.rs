@@ -43,11 +43,11 @@ use crate::midi::stream_parser::DecodedEvent;
 use crate::midi::stream_parser::StreamParser;
 use crate::name::Name;
 use crate::time::Instant;
+use crate::CoreMidiError;
 use crate::Destination;
 use crate::DestinationChange;
 use crate::Error;
 use crate::IoError;
-use crate::PlatformError;
 use crate::PortId;
 use crate::RawMidiMessage;
 use crate::Source;
@@ -186,7 +186,7 @@ static GLOBAL_IO: Mutex<Option<Arc<GlobalIo>>> = Mutex::new(None);
 
 extern "C" fn keep_alive_noop(_timer: CFRunLoopTimerRef, _info: *mut std::ffi::c_void) {}
 
-fn init_global_io() -> Result<GlobalIo, PlatformError> {
+fn init_global_io() -> Result<GlobalIo, IoError> {
     let ctx = GlobalContext {
         senders: Arc::new(Mutex::new(HashMap::new())),
         output_senders: Arc::new(Mutex::new(HashMap::new())),
@@ -236,7 +236,7 @@ fn init_global_io() -> Result<GlobalIo, PlatformError> {
         })
         .is_err()
     {
-        return Err(PlatformError::ThreadInit);
+        return Err(IoError::ThreadInit);
     }
 
     match client_rx.recv() {
@@ -246,8 +246,8 @@ fn init_global_io() -> Result<GlobalIo, PlatformError> {
             next_id: AtomicU64::new(0),
             calibration: TimeCalibration::capture(),
         }),
-        Ok(Err(status)) => Err(PlatformError::ClientInit(status)),
-        Err(_) => Err(PlatformError::ThreadInit),
+        Ok(Err(status)) => Err(IoError::Platform(CoreMidiError::from(status).into())),
+        Err(_) => Err(IoError::ThreadInit),
     }
 }
 
@@ -256,7 +256,7 @@ fn ensure_global_io() -> Result<Arc<GlobalIo>, Error> {
     if let Some(io) = guard.as_ref() {
         return Ok(Arc::clone(io));
     }
-    let io = Arc::new(init_global_io().map_err(IoError::Platform)?);
+    let io = Arc::new(init_global_io()?);
     *guard = Some(Arc::clone(&io));
     Ok(io)
 }
@@ -327,7 +327,7 @@ fn choose_unique_id(
             Error::from(if status == coremidi_sys::kMIDIIDNotUnique {
                 IoError::UniqueIdTaken
             } else {
-                IoError::Platform(PlatformError::VirtualPortCreate(status))
+                IoError::Platform(CoreMidiError::from(status).into())
             })
         })?;
     if let Some(stale) = assigned {
@@ -524,7 +524,7 @@ impl Backend {
                     Ok(c) => c,
                     Err(status) => {
                         let _ = ready_tx.send(Err(Error::from(IoError::Platform(
-                            PlatformError::ClientInit(status),
+                            CoreMidiError::from(status).into(),
                         ))));
                         return;
                     }
@@ -636,7 +636,7 @@ impl Backend {
                                 },
                                 Err(status) => {
                                     let _ = reply.send(Err(Error::from(IoError::Platform(
-                                        PlatformError::VirtualPortCreate(status),
+                                        CoreMidiError::from(status).into(),
                                     ))));
                                 }
                             }
@@ -691,7 +691,7 @@ impl Backend {
                                 }
                                 Err(status) => {
                                     let _ = reply.send(Err(Error::from(IoError::Platform(
-                                        PlatformError::VirtualPortCreate(status),
+                                        CoreMidiError::from(status).into(),
                                     ))));
                                 }
                             }
@@ -716,7 +716,9 @@ impl Backend {
                             if let Some(source) = virtual_sources.get(&id.0) {
                                 let buf = PacketBuffer::new(0, &msg);
                                 let _ = reply.send(source.received(&buf).map_err(|status| {
-                                    Error::from(IoError::Platform(PlatformError::Send(status)))
+                                    Error::from(IoError::Platform(
+                                        CoreMidiError::from(status).into(),
+                                    ))
                                 }));
                             } else {
                                 let _ = reply.send(Err(Error::from(IoError::PortNotFound)));
@@ -726,7 +728,9 @@ impl Backend {
                             if let Some(source) = virtual_sources.get(&id.0) {
                                 let buf = PacketBuffer::new(0, &data);
                                 let _ = reply.send(source.received(&buf).map_err(|status| {
-                                    Error::from(IoError::Platform(PlatformError::Send(status)))
+                                    Error::from(IoError::Platform(
+                                        CoreMidiError::from(status).into(),
+                                    ))
                                 }));
                             } else {
                                 let _ = reply.send(Err(Error::from(IoError::PortNotFound)));
@@ -820,7 +824,7 @@ fn handle_connect_destination(
     }
     let destination_port = client
         .output_port(&format!("midi-io-out-{uid}"))
-        .map_err(|status| IoError::Platform(PlatformError::Connect(status)))?;
+        .map_err(|status| IoError::Platform(CoreMidiError::from(status).into()))?;
 
     disconnected_outputs.lock_unpoisoned().remove(&uid);
     global
@@ -870,7 +874,7 @@ fn handle_send_midi(
     state
         .destination_port
         .send(&state.destination, &buf)
-        .map_err(|status| Error::from(IoError::Platform(PlatformError::Send(status))))
+        .map_err(|status| Error::from(IoError::Platform(CoreMidiError::from(status).into())))
 }
 
 fn handle_send_sysex(
@@ -884,7 +888,7 @@ fn handle_send_sysex(
     state
         .destination_port
         .send(&state.destination, &buf)
-        .map_err(|status| Error::from(IoError::Platform(PlatformError::Send(status))))
+        .map_err(|status| Error::from(IoError::Platform(CoreMidiError::from(status).into())))
 }
 
 fn drain_streams_backend_died(source_streams: &HashMap<i32, StreamSenders>) {
@@ -943,7 +947,7 @@ fn connect_source(
                 });
             }
         })
-        .map_err(|status| IoError::Platform(PlatformError::Connect(status)))?;
+        .map_err(|status| IoError::Platform(CoreMidiError::from(status).into()))?;
 
     let disc_senders = senders.clone();
     global
@@ -965,7 +969,7 @@ fn connect_source(
             uid,
             client_id,
         );
-        return Err(IoError::Platform(PlatformError::Connect(status)).into());
+        return Err(IoError::Platform(CoreMidiError::from(status).into()).into());
     }
 
     connections.lock_unpoisoned().insert(
