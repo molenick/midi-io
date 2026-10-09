@@ -145,10 +145,44 @@ impl From<coremidi_sys::OSStatus> for CoreMidiError {
 
 #[cfg(all(feature = "io", target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("{name}: {message}")]
-pub struct WebError {
-    pub name: String,
-    pub message: String,
+#[non_exhaustive]
+pub enum WebError {
+    #[error("AbortError: {0}")]
+    Abort(String),
+    #[error("InvalidAccessError: {0}")]
+    InvalidAccess(String),
+    #[error("InvalidStateError: {0}")]
+    InvalidState(String),
+    #[error("NotAllowedError: {0}")]
+    NotAllowed(String),
+    #[error("NotSupportedError: {0}")]
+    NotSupported(String),
+    #[error("SecurityError: {0}")]
+    Security(String),
+    #[error("TypeError: {0}")]
+    Type(String),
+    #[error("{name}: {message}")]
+    Other { name: String, message: String },
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<web_sys::DomException> for WebError {
+    fn from(exception: web_sys::DomException) -> Self {
+        let message = exception.message();
+        match exception.name().as_str() {
+            "AbortError" => Self::Abort(message),
+            "InvalidAccessError" => Self::InvalidAccess(message),
+            "InvalidStateError" => Self::InvalidState(message),
+            "NotAllowedError" => Self::NotAllowed(message),
+            "NotSupportedError" => Self::NotSupported(message),
+            "SecurityError" => Self::Security(message),
+            "TypeError" => Self::Type(message),
+            _ => Self::Other {
+                name: exception.name(),
+                message,
+            },
+        }
+    }
 }
 
 #[cfg(feature = "io")]

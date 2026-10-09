@@ -265,17 +265,11 @@ fn map_web_error(value: JsValue) -> IoError {
     let Ok(exception) = value.dyn_into::<DomException>() else {
         return IoError::Unsupported;
     };
-    match exception.name().as_str() {
-        "SecurityError" | "NotAllowedError" => IoError::PermissionDenied,
-        "NotSupportedError" => IoError::Unsupported,
-        "InvalidStateError" => IoError::PortDisconnected,
-        _ => IoError::Platform(
-            WebError {
-                name: exception.name(),
-                message: exception.message(),
-            }
-            .into(),
-        ),
+    match WebError::from(exception) {
+        WebError::Security(_) | WebError::NotAllowed(_) => IoError::PermissionDenied,
+        WebError::NotSupported(_) => IoError::Unsupported,
+        WebError::InvalidState(_) => IoError::PortDisconnected,
+        other => IoError::Platform(other.into()),
     }
 }
 
