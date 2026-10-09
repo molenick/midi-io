@@ -5,11 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.3.0
 
-- Actually send to ALSA destinations
-- Web synth example: port lists, MIDI log, browser support legend
-- `PlatformError` now carries the backend's own error (`AlsaError`, `CoreMidiError`, `WebError`) instead of a bare code; `Encode` moves to `IoError`; `ThreadInit` becomes `ThreadSpawn(io::Error)`; `IoError::Web`, `UniqueIdTaken` and `PermissionDenied` are removed, so platform errors always arrive as `Platform` with the backend's own text; `Error` no longer derives `Clone`, `PartialEq`, `Eq`
+- `PlatformError` now carries the backend's own error (`AlsaError`, `CoreMidiError`, `WebError`) instead of a bare code; `Encode` moves to `IoError`; `ThreadInit` becomes `ThreadSpawn(io::Error)`; `IoError::Web`, `UniqueIdTaken` and `PermissionDenied` are removed, so platform errors always arrive as `Platform` with the backend's own text; `Error` no longer derives `Clone`, `PartialEq`, `Eq` (https://github.com/molenick/midi-io/pull/20)
+- Web synth example: port lists, MIDI log, browser support legend (https://github.com/molenick/midi-io/pull/19)
+
+## 0.2.1
+
+- Actually send to ALSA destinations (https://github.com/molenick/midi-io/pull/17)
 
 ## 0.2.0
 

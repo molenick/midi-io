@@ -53,7 +53,7 @@ cargo add midi-io
 ```
 
 For codec-only use, disable default features:
-`midi-io = { version = "0.1", default-features = false }`.
+`midi-io = { version = "0.3", default-features = false }`.
 
 ## License
 
