@@ -157,13 +157,14 @@ pub enum WebError {
     Type(String),
     #[error("{name}: {message}")]
     Other { name: String, message: String },
+    #[error("{0}")]
+    Value(String),
 }
 
 #[cfg(all(feature = "io", target_arch = "wasm32"))]
-impl From<web_sys::DomException> for WebError {
-    fn from(exception: web_sys::DomException) -> Self {
-        let message = exception.message();
-        match exception.name().as_str() {
+impl WebError {
+    fn from_name(name: String, message: String) -> Self {
+        match name.as_str() {
             "AbortError" => Self::Abort(message),
             "InvalidAccessError" => Self::InvalidAccess(message),
             "InvalidStateError" => Self::InvalidState(message),
@@ -171,9 +172,34 @@ impl From<web_sys::DomException> for WebError {
             "NotSupportedError" => Self::NotSupported(message),
             "SecurityError" => Self::Security(message),
             "TypeError" => Self::Type(message),
-            _ => Self::Other {
-                name: exception.name(),
-                message,
+            _ => Self::Other { name, message },
+        }
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<web_sys::DomException> for WebError {
+    fn from(exception: web_sys::DomException) -> Self {
+        Self::from_name(exception.name(), exception.message())
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<js_sys::Error> for WebError {
+    fn from(error: js_sys::Error) -> Self {
+        Self::from_name(error.name().into(), error.message().into())
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<wasm_bindgen::JsValue> for WebError {
+    fn from(value: wasm_bindgen::JsValue) -> Self {
+        use wasm_bindgen::JsCast;
+        match value.dyn_into::<web_sys::DomException>() {
+            Ok(exception) => exception.into(),
+            Err(value) => match value.dyn_into::<js_sys::Error>() {
+                Ok(error) => error.into(),
+                Err(value) => Self::Value(format!("{value:?}")),
             },
         }
     }

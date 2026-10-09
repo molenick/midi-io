@@ -8,7 +8,6 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::DomException;
 use web_sys::MidiAccess;
 use web_sys::MidiConnectionEvent;
 use web_sys::MidiInput;
@@ -262,10 +261,7 @@ async fn request_access() -> Result<MidiAccess, Error> {
 }
 
 fn map_web_error(value: JsValue) -> IoError {
-    let Ok(exception) = value.dyn_into::<DomException>() else {
-        return IoError::Unsupported;
-    };
-    IoError::Platform(WebError::from(exception).into())
+    IoError::Platform(WebError::from(value).into())
 }
 
 fn connect_destination(
