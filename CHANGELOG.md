@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Actually send to ALSA destinations
 - Web synth example: port lists, MIDI log, browser support legend
-- `PlatformError` now carries the backend's own error (`AlsaError`, `CoreMidiError`, `WebError`) instead of a bare code; `ThreadInit` and `Encode` move to `IoError`; `IoError::Web` is removed
+- `PlatformError` now carries the backend's own error (`AlsaError`, `CoreMidiError`, `WebError`) instead of a bare code; `Encode` moves to `IoError`; `ThreadInit` becomes `ThreadSpawn(io::Error)`; `IoError::Web` is removed; `Error` no longer derives `Clone`, `PartialEq`, `Eq`
 
 ## 0.2.0
 

@@ -200,7 +200,7 @@ fn init_global_io() -> Result<GlobalIo, IoError> {
     let ctx_thread = ctx.clone();
     let (client_tx, client_rx) = std::sync::mpsc::channel::<Result<coremidi::Client, i32>>();
 
-    if std::thread::Builder::new()
+    std::thread::Builder::new()
         .name("midi-io-global".to_string())
         .spawn(move || {
             *ctx_thread.source_cache.lock_unpoisoned() = init_source_cache();
@@ -233,11 +233,7 @@ fn init_global_io() -> Result<GlobalIo, IoError> {
                 log_warn!("CoreMIDI global run loop returned unexpectedly; re-entering");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
-        })
-        .is_err()
-    {
-        return Err(IoError::ThreadInit);
-    }
+        })?;
 
     match client_rx.recv() {
         Ok(Ok(io_client)) => Ok(GlobalIo {
@@ -247,7 +243,7 @@ fn init_global_io() -> Result<GlobalIo, IoError> {
             calibration: TimeCalibration::capture(),
         }),
         Ok(Err(status)) => Err(IoError::Platform(CoreMidiError::from(status).into())),
-        Err(_) => Err(IoError::ThreadInit),
+        Err(_) => Err(IoError::BackendThreadDied),
     }
 }
 

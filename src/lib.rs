@@ -50,8 +50,6 @@ mod io {
     pub use crate::connection::Timed;
     pub use crate::connection::VirtualDestination;
     pub use crate::connection::VirtualSource;
-    #[cfg(target_os = "linux")]
-    pub use crate::error::AlsaError;
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     pub use crate::error::CoreMidiError;
     pub use crate::error::IoError;
