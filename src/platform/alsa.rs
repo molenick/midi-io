@@ -52,7 +52,6 @@ use crate::IoError;
 use crate::MidiMessage;
 use crate::ParseError;
 use crate::PitchBend;
-use crate::PlatformError;
 use crate::PortId;
 use crate::RawMidiMessage;
 use crate::SongPosition;
@@ -156,7 +155,7 @@ impl Backend {
     ) -> Result<Self, Error> {
         let efd = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
         if efd < 0 {
-            return Err(IoError::Platform(PlatformError::ThreadInit).into());
+            return Err(IoError::ThreadSpawn(std::io::Error::last_os_error()).into());
         }
         let efd = Arc::new(unsafe { OwnedFd::from_raw_fd(efd) });
 
@@ -195,42 +194,38 @@ impl Backend {
 }
 
 fn init_seq(name: &Name) -> Result<SeqContext, Error> {
-    let seq = Seq::open(None, None, true)
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+    let seq = Seq::open(None, None, true).map_err(|e| IoError::Platform(e.into()))?;
     seq.set_client_name(name.as_c_str())
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     let our_port = seq
         .create_simple_port(
             c"midi-io-input",
             PortCap::WRITE | PortCap::SUBS_WRITE,
             PortType::APPLICATION,
         )
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     let our_send_port = seq
         .create_simple_port(
             c"midi-io-output",
             PortCap::READ | PortCap::SUBS_READ,
             PortType::APPLICATION,
         )
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
-    let our_client = seq
-        .client_id()
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
+    let our_client = seq.client_id().map_err(|e| IoError::Platform(e.into()))?;
     let queue_id = seq
         .alloc_named_queue(c"midi-io-ts")
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     seq.control_queue(queue_id, EventType::Start, 0, None::<&mut alsa::seq::Event>)
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     let queue_start_instant = Instant::now();
-    let sub = PortSubscribe::empty()
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+    let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
     sub.set_sender(Addr::system_announce());
     sub.set_dest(Addr {
         client: our_client,
         port: our_port,
     });
     seq.subscribe_port(&sub)
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     Ok(SeqContext {
         seq,
         our_client,
@@ -497,9 +492,7 @@ impl PortRegistry {
                             let _ = reply.send(Ok(port));
                         }
                         Err(e) => {
-                            let _ = reply.send(Err(Error::from(IoError::Platform(
-                                PlatformError::VirtualPortCreate(e.errno()),
-                            ))));
+                            let _ = reply.send(Err(Error::from(IoError::Platform(e.into()))));
                         }
                     }
                 }
@@ -541,9 +534,7 @@ impl PortRegistry {
                         let _ = reply.send(Ok((port, receivers)));
                     }
                     Err(e) => {
-                        let _ = reply.send(Err(Error::from(IoError::Platform(
-                            PlatformError::VirtualPortCreate(e.errno()),
-                        ))));
+                        let _ = reply.send(Err(Error::from(IoError::Platform(e.into()))));
                     }
                 },
                 Command::SendVirtualMidi { id, msg, reply } => {
@@ -753,8 +744,7 @@ impl PortRegistry {
             return Err(IoError::PortNotFound.into());
         }
 
-        let sub = PortSubscribe::empty()
-            .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+        let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
         sub.set_sender(Addr {
             client: key.0,
             port: key.1,
@@ -768,7 +758,7 @@ impl PortRegistry {
         sub.set_time_real(true);
         ctx.seq
             .subscribe_port(&sub)
-            .map_err(|e| IoError::Platform(PlatformError::Connect(e.errno())))?;
+            .map_err(|e| IoError::Platform(e.into()))?;
 
         let (senders, receivers) = StreamSenders::channel();
         self.connections.insert(
@@ -783,8 +773,7 @@ impl PortRegistry {
 }
 
 fn subscribe_destination(ctx: &SeqContext, key: AlsaPortKey) -> Result<(), Error> {
-    let sub = PortSubscribe::empty()
-        .map_err(|e| IoError::Platform(PlatformError::ClientInit(e.errno())))?;
+    let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
     sub.set_sender(Addr {
         client: ctx.our_client,
         port: ctx.our_send_port,
@@ -795,7 +784,7 @@ fn subscribe_destination(ctx: &SeqContext, key: AlsaPortKey) -> Result<(), Error
     });
     ctx.seq
         .subscribe_port(&sub)
-        .map_err(|e| IoError::Platform(PlatformError::Connect(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     Ok(())
 }
 
@@ -821,15 +810,13 @@ fn send_encoded(
     dest: Addr,
 ) -> Result<(), Error> {
     coder.reset_encode();
-    let (_, maybe_ev) = coder
-        .encode(msg)
-        .map_err(|e| IoError::Platform(PlatformError::Send(e.errno())))?;
-    let mut ev = maybe_ev.ok_or(IoError::Platform(PlatformError::Encode))?;
+    let (_, maybe_ev) = coder.encode(msg).map_err(|e| IoError::Platform(e.into()))?;
+    let mut ev = maybe_ev.ok_or(IoError::Encode)?;
     ev.set_source(source);
     ev.set_dest(dest);
     ev.set_direct();
     seq.event_output_direct(&mut ev)
-        .map_err(|e| IoError::Platform(PlatformError::Send(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     Ok(())
 }
 
@@ -840,7 +827,7 @@ fn send_sysex_event(seq: &Seq, data: Vec<u8>, source: i32, dest: Addr) -> Result
     let mut ev = ev.into_owned();
     ev.set_direct();
     seq.event_output_direct(&mut ev)
-        .map_err(|e| IoError::Platform(PlatformError::Send(e.errno())))?;
+        .map_err(|e| IoError::Platform(e.into()))?;
     Ok(())
 }
 
@@ -885,9 +872,7 @@ fn run_thread(
     let send_coder = match MidiEvent::new(4) {
         Ok(v) => v,
         Err(e) => {
-            let _ = ready_tx.send(Err(Error::from(IoError::Platform(
-                PlatformError::ClientInit(e.errno()),
-            ))));
+            let _ = ready_tx.send(Err(Error::from(IoError::Platform(e.into()))));
             return;
         }
     };
@@ -899,9 +884,7 @@ fn run_thread(
     let alsa_pfds = match (&ctx.seq, Some(Direction::Capture)).get() {
         Ok(p) => p,
         Err(e) => {
-            let _ = ready_tx.send(Err(Error::from(IoError::Platform(
-                PlatformError::ClientInit(e.errno()),
-            ))));
+            let _ = ready_tx.send(Err(Error::from(IoError::Platform(e.into()))));
             return;
         }
     };

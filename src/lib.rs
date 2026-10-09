@@ -50,9 +50,13 @@ mod io {
     pub use crate::connection::Timed;
     pub use crate::connection::VirtualDestination;
     pub use crate::connection::VirtualSource;
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    pub use crate::error::CoreMidiError;
     pub use crate::error::IoError;
     pub use crate::error::NameError;
     pub use crate::error::PlatformError;
+    #[cfg(target_arch = "wasm32")]
+    pub use crate::error::WebError;
     pub use crate::port::Destination;
     pub use crate::port::DestinationChange;
     pub use crate::port::PortId;

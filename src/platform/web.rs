@@ -8,7 +8,6 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::DomException;
 use web_sys::MidiAccess;
 use web_sys::MidiConnectionEvent;
 use web_sys::MidiInput;
@@ -37,6 +36,7 @@ use crate::IoError;
 use crate::PortId;
 use crate::Source;
 use crate::SourceChange;
+use crate::WebError;
 
 fn port_handle(js_id: &str) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -261,15 +261,7 @@ async fn request_access() -> Result<MidiAccess, Error> {
 }
 
 fn map_web_error(value: JsValue) -> IoError {
-    let Ok(exception) = value.dyn_into::<DomException>() else {
-        return IoError::Unsupported;
-    };
-    match exception.name().as_str() {
-        "SecurityError" | "NotAllowedError" => IoError::PermissionDenied,
-        "NotSupportedError" => IoError::Unsupported,
-        "InvalidStateError" => IoError::PortDisconnected,
-        _ => IoError::Web(exception.message()),
-    }
+    IoError::Platform(WebError::from(value).into())
 }
 
 fn connect_destination(

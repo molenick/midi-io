@@ -2,7 +2,7 @@ use crate::CodecError;
 use crate::SysExError;
 use crate::ValueError;
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
     #[error(transparent)]
@@ -20,7 +20,7 @@ pub enum Error {
 }
 
 #[cfg(feature = "io")]
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum IoError {
     #[error("port not found")]
@@ -35,6 +35,8 @@ pub enum IoError {
 
     #[error("platform backend thread terminated unexpectedly")]
     BackendThreadDied,
+    #[error("IO thread spawn failed: {0}")]
+    ThreadSpawn(#[from] std::io::Error),
     #[error("backend not ready")]
     NotReady,
     #[error("command channel full - backend thread is not processing commands")]
@@ -43,38 +45,164 @@ pub enum IoError {
     #[error(transparent)]
     Platform(#[from] PlatformError),
 
+    #[error("MIDI encoder produced no event")]
+    Encode,
+
     #[error("inbound stream overflow - {dropped} message(s) dropped")]
     InboundOverflow { dropped: usize },
 
     #[error("unsupported on this platform")]
     Unsupported,
-
-    #[error("another endpoint already holds that unique ID")]
-    UniqueIdTaken,
-
-    #[error("MIDI access denied")]
-    PermissionDenied,
-
-    #[error("MIDI error: {0}")]
-    Web(String),
 }
 
 #[cfg(feature = "io")]
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum PlatformError {
-    #[error("client initialization failed: backend error code {0}")]
-    ClientInit(i32),
-    #[error("client initialization failed: IO thread initialization failed")]
-    ThreadInit,
-    #[error("connect failed: backend error code {0}")]
-    Connect(i32),
-    #[error("send failed: backend error code {0}")]
-    Send(i32),
-    #[error("send failed: MIDI encoder produced no event for valid input")]
-    Encode,
-    #[error("virtual port creation failed: backend error code {0}")]
-    VirtualPortCreate(i32),
+    #[cfg(target_os = "linux")]
+    #[error(transparent)]
+    Alsa(#[from] alsa::Error),
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[error(transparent)]
+    CoreMidi(#[from] CoreMidiError),
+
+    #[cfg(target_arch = "wasm32")]
+    #[error(transparent)]
+    Web(#[from] WebError),
+}
+
+#[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CoreMidiError {
+    #[error("kMIDIInvalidClient")]
+    InvalidClient,
+    #[error("kMIDIInvalidPort")]
+    InvalidPort,
+    #[error("kMIDIWrongEndpointType")]
+    WrongEndpointType,
+    #[error("kMIDINoConnection")]
+    NoConnection,
+    #[error("kMIDIUnknownEndpoint")]
+    UnknownEndpoint,
+    #[error("kMIDIUnknownProperty")]
+    UnknownProperty,
+    #[error("kMIDIWrongPropertyType")]
+    WrongPropertyType,
+    #[error("kMIDINoCurrentSetup")]
+    NoCurrentSetup,
+    #[error("kMIDIMessageSendErr")]
+    MessageSendErr,
+    #[error("kMIDIServerStartErr")]
+    ServerStartErr,
+    #[error("kMIDISetupFormatErr")]
+    SetupFormatErr,
+    #[error("kMIDIWrongThread")]
+    WrongThread,
+    #[error("kMIDIObjectNotFound")]
+    ObjectNotFound,
+    #[error("kMIDIIDNotUnique")]
+    IdNotUnique,
+    #[error("kMIDINotPermitted")]
+    NotPermitted,
+    #[error("kMIDIUnknownError")]
+    UnknownError,
+    #[error("OSStatus {0}")]
+    Other(coremidi_sys::OSStatus),
+}
+
+#[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+impl From<coremidi_sys::OSStatus> for CoreMidiError {
+    fn from(status: coremidi_sys::OSStatus) -> Self {
+        match status {
+            coremidi_sys::kMIDIInvalidClient => Self::InvalidClient,
+            coremidi_sys::kMIDIInvalidPort => Self::InvalidPort,
+            coremidi_sys::kMIDIWrongEndpointType => Self::WrongEndpointType,
+            coremidi_sys::kMIDINoConnection => Self::NoConnection,
+            coremidi_sys::kMIDIUnknownEndpoint => Self::UnknownEndpoint,
+            coremidi_sys::kMIDIUnknownProperty => Self::UnknownProperty,
+            coremidi_sys::kMIDIWrongPropertyType => Self::WrongPropertyType,
+            coremidi_sys::kMIDINoCurrentSetup => Self::NoCurrentSetup,
+            coremidi_sys::kMIDIMessageSendErr => Self::MessageSendErr,
+            coremidi_sys::kMIDIServerStartErr => Self::ServerStartErr,
+            coremidi_sys::kMIDISetupFormatErr => Self::SetupFormatErr,
+            coremidi_sys::kMIDIWrongThread => Self::WrongThread,
+            coremidi_sys::kMIDIObjectNotFound => Self::ObjectNotFound,
+            coremidi_sys::kMIDIIDNotUnique => Self::IdNotUnique,
+            coremidi_sys::kMIDINotPermitted => Self::NotPermitted,
+            coremidi_sys::kMIDIUnknownError => Self::UnknownError,
+            other => Self::Other(other),
+        }
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum WebError {
+    #[error("AbortError: {0}")]
+    Abort(String),
+    #[error("InvalidAccessError: {0}")]
+    InvalidAccess(String),
+    #[error("InvalidStateError: {0}")]
+    InvalidState(String),
+    #[error("NotAllowedError: {0}")]
+    NotAllowed(String),
+    #[error("NotSupportedError: {0}")]
+    NotSupported(String),
+    #[error("SecurityError: {0}")]
+    Security(String),
+    #[error("TypeError: {0}")]
+    Type(String),
+    #[error("{name}: {message}")]
+    Other { name: String, message: String },
+    #[error("{0}")]
+    Value(String),
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl WebError {
+    fn from_name(name: String, message: String) -> Self {
+        match name.as_str() {
+            "AbortError" => Self::Abort(message),
+            "InvalidAccessError" => Self::InvalidAccess(message),
+            "InvalidStateError" => Self::InvalidState(message),
+            "NotAllowedError" => Self::NotAllowed(message),
+            "NotSupportedError" => Self::NotSupported(message),
+            "SecurityError" => Self::Security(message),
+            "TypeError" => Self::Type(message),
+            _ => Self::Other { name, message },
+        }
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<web_sys::DomException> for WebError {
+    fn from(exception: web_sys::DomException) -> Self {
+        Self::from_name(exception.name(), exception.message())
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<js_sys::Error> for WebError {
+    fn from(error: js_sys::Error) -> Self {
+        Self::from_name(error.name().into(), error.message().into())
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<wasm_bindgen::JsValue> for WebError {
+    fn from(value: wasm_bindgen::JsValue) -> Self {
+        use wasm_bindgen::JsCast;
+        match value.dyn_into::<web_sys::DomException>() {
+            Ok(exception) => exception.into(),
+            Err(value) => match value.dyn_into::<js_sys::Error>() {
+                Ok(error) => error.into(),
+                Err(value) => Self::Value(format!("{value:?}")),
+            },
+        }
+    }
 }
 
 #[cfg(feature = "io")]
@@ -95,38 +223,47 @@ mod tests {
         std::ffi::CString::new("a\0b").unwrap_err()
     }
 
+    #[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
     #[test]
-    fn error_is_clone_and_partial_eq() {
-        let s1: Error = CodecError::SysexTooLong { len: 100, max: 50 }.into();
-        let s2: Error = CodecError::SysexTooLong { len: 100, max: 50 }.into();
-        assert_eq!(s1.clone(), s2);
+    fn coremidi_error_from_status() {
+        let known = CoreMidiError::from(coremidi_sys::kMIDINoConnection);
+        assert_eq!(known, CoreMidiError::NoConnection);
+        assert_eq!(format!("{known}"), "kMIDINoConnection");
+        let other = CoreMidiError::from(-50);
+        assert_eq!(other, CoreMidiError::Other(-50));
+        assert_eq!(format!("{other}"), "OSStatus -50");
 
-        let p1: Error = CodecError::Parse {
-            reason: ParseError::Empty,
-            bytes: vec![],
-        }
-        .into();
-        let p2: Error = CodecError::Parse {
-            reason: ParseError::Empty,
-            bytes: vec![],
-        }
-        .into();
-        assert_eq!(p1.clone(), p2);
+        let err: Error = IoError::Platform(known.into()).into();
+        assert!(matches!(
+            err,
+            Error::Io(IoError::Platform(PlatformError::CoreMidi(
+                CoreMidiError::NoConnection
+            )))
+        ));
+    }
 
-        let u1: Error = CodecError::Unparseable(crate::RawMidiMessage::from_slice(&[0xF4])).into();
-        let u2: Error = CodecError::Unparseable(crate::RawMidiMessage::from_slice(&[0xF4])).into();
-        assert_eq!(u1.clone(), u2);
+    #[cfg(all(feature = "io", target_os = "linux"))]
+    #[test]
+    fn alsa_error_is_forwarded() {
+        let inner = alsa::Error::new("snd_seq_open", libc::ENOENT);
+        let err: Error = IoError::Platform(inner.into()).into();
+        assert_eq!(format!("{err}"), format!("{inner}"));
+        assert!(matches!(
+            err,
+            Error::Io(IoError::Platform(PlatformError::Alsa(e))) if e == inner
+        ));
+    }
 
-        #[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
-        {
-            let e1: Error = IoError::InvalidName(NameError::ContainsNul(nul_error())).into();
-            let e2: Error = IoError::InvalidName(NameError::ContainsNul(nul_error())).into();
-            assert_eq!(e1.clone(), e2);
-
-            let c1: Error = IoError::Platform(PlatformError::Send(-1)).into();
-            let c2: Error = IoError::Platform(PlatformError::Send(-1)).into();
-            assert_eq!(c1.clone(), c2);
-        }
+    #[cfg(feature = "io")]
+    #[test]
+    fn thread_spawn_forwards_io_error() {
+        let inner = std::io::Error::new(std::io::ErrorKind::WouldBlock, "no threads");
+        let err: Error = IoError::ThreadSpawn(inner).into();
+        assert_eq!(format!("{err}"), "IO thread spawn failed: no threads");
+        assert!(matches!(
+            err,
+            Error::Io(IoError::ThreadSpawn(e)) if e.kind() == std::io::ErrorKind::WouldBlock
+        ));
     }
 
     #[cfg(feature = "io")]
