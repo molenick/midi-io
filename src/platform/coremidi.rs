@@ -319,13 +319,7 @@ fn choose_unique_id(
     }
     coremidi::Properties::unique_id()
         .set_value(vdest, wanted)
-        .map_err(|status| {
-            Error::from(if status == coremidi_sys::kMIDIIDNotUnique {
-                IoError::UniqueIdTaken
-            } else {
-                IoError::Platform(CoreMidiError::from(status).into())
-            })
-        })?;
+        .map_err(|status| Error::from(IoError::Platform(CoreMidiError::from(status).into())))?;
     if let Some(stale) = assigned {
         let removed = ctx.dest_cache.lock_unpoisoned().remove(&stale);
         if let Some((_, port)) = removed {

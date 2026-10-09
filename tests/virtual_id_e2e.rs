@@ -1,8 +1,10 @@
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
 use midi_io::Client;
+use midi_io::CoreMidiError;
 use midi_io::Error;
 use midi_io::IoError;
+use midi_io::PlatformError;
 
 fn unused_id() -> u32 {
     let nanos = std::time::SystemTime::now()
@@ -76,6 +78,14 @@ async fn a_unique_id_held_by_another_endpoint_is_refused() {
         )
         .await
         .unwrap_err();
-    assert!(matches!(err, Error::Io(IoError::UniqueIdTaken)), "{err:?}");
+    assert!(
+        matches!(
+            err,
+            Error::Io(IoError::Platform(PlatformError::CoreMidi(
+                CoreMidiError::IdNotUnique
+            )))
+        ),
+        "{err:?}"
+    );
     assert_eq!(held.as_destination().id().to_bits(), u64::from(wanted));
 }
