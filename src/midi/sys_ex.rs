@@ -4,6 +4,18 @@ use crate::SysExError;
 pub(crate) const MAX_SYSEX_BYTES: usize = 1024 * 1024;
 
 /// The amount of orphaned data bytes show as part of an error. Limited to prevent denial-of-service through unlimited allocation.
+#[cfg(any(
+    all(
+        feature = "io",
+        any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "linux",
+            target_arch = "wasm32"
+        )
+    ),
+    test
+))]
 pub(crate) const ORPHAN_PREFIX_BYTES: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

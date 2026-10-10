@@ -15,6 +15,7 @@ jobs:
       - run: cargo +nightly fmt --check
       - run: cargo check
       - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --no-default-features -- -D warnings
       - run: cargo build --examples
       - name: Unit tests
         run: cargo test --lib
