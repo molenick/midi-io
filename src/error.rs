@@ -25,8 +25,8 @@ pub enum Error {
 pub enum IoError {
     #[error("port not found")]
     PortNotFound,
-    #[error("port disconnected")]
-    PortDisconnected,
+    #[error("port disconnected{}", detail(.0))]
+    PortDisconnected(#[source] Option<PlatformError>),
     #[error("port already connected")]
     AlreadyConnected,
 
@@ -55,8 +55,13 @@ pub enum IoError {
     #[error("inbound stream overflow - {dropped} message(s) dropped")]
     InboundOverflow { dropped: usize },
 
-    #[error("unsupported on this platform")]
-    Unsupported,
+    #[error("unsupported on this platform{}", detail(.0))]
+    Unsupported(#[source] Option<PlatformError>),
+}
+
+#[cfg(feature = "io")]
+fn detail(error: &Option<PlatformError>) -> String {
+    error.as_ref().map(|e| format!(": {e}")).unwrap_or_default()
 }
 
 #[cfg(feature = "io")]
@@ -92,6 +97,10 @@ impl From<PlatformError> for IoError {
             PlatformError::Web(WebError::NotAllowed(_) | WebError::Security(_)) => {
                 Self::PermissionDenied(error)
             }
+            #[cfg(target_arch = "wasm32")]
+            PlatformError::Web(WebError::NotSupported(_)) => Self::Unsupported(Some(error)),
+            #[cfg(target_arch = "wasm32")]
+            PlatformError::Web(WebError::InvalidState(_)) => Self::PortDisconnected(Some(error)),
             _ => Self::Platform(error),
         }
     }
@@ -297,6 +306,13 @@ mod tests {
             taken,
             IoError::UniqueIdTaken(PlatformError::CoreMidi(CoreMidiError::IdNotUnique))
         ));
+
+        let gone = IoError::PortDisconnected(Some(CoreMidiError::NoConnection.into()));
+        assert_eq!(format!("{gone}"), "port disconnected: kMIDINoConnection");
+        assert_eq!(
+            format!("{}", IoError::PortDisconnected(None)),
+            "port disconnected"
+        );
 
         let denied = IoError::from(CoreMidiError::from(coremidi_sys::kMIDINotPermitted));
         assert_eq!(format!("{denied}"), "MIDI access denied: kMIDINotPermitted");

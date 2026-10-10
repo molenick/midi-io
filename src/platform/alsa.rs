@@ -326,7 +326,8 @@ impl PortRegistry {
     fn remove_source(&mut self, key: AlsaPortKey) {
         if let Some(port) = self.source_cache.remove(&key) {
             if let Some(conn) = self.connections.get(&key) {
-                conn.senders.lifecycle_error(IoError::PortDisconnected);
+                conn.senders
+                    .lifecycle_error(IoError::PortDisconnected(None));
             }
             notify_subscribers(&self.source_subs, SourceChange::Removed(port));
         }
@@ -508,7 +509,7 @@ impl PortRegistry {
                     reply,
                     ..
                 } => {
-                    let _ = reply.send(Err(IoError::Unsupported.into()));
+                    let _ = reply.send(Err(IoError::Unsupported(None).into()));
                 }
                 Command::CreateVirtualDestination {
                     id,
@@ -553,7 +554,9 @@ impl PortRegistry {
                 Command::DestroyVirtualDestination(id) => {
                     if let Some(alsa_port) = self.vdest_ports.remove(&id.0) {
                         if let Some(state) = self.vdest_recv.remove(&alsa_port) {
-                            state.senders.lifecycle_error(IoError::PortDisconnected);
+                            state
+                                .senders
+                                .lifecycle_error(IoError::PortDisconnected(None));
                         }
                         self.remove_destination(AlsaPortKey(ctx.our_client, alsa_port));
                         let _ = ctx.seq.delete_port(alsa_port);
@@ -716,7 +719,7 @@ impl PortRegistry {
     fn resolve_output_state(&self, key: &AlsaPortKey) -> Result<(), Error> {
         match self.destination_connections.get(key) {
             None => Err(IoError::PortNotFound.into()),
-            Some(conn) if conn.disconnected => Err(IoError::PortDisconnected.into()),
+            Some(conn) if conn.disconnected => Err(IoError::PortDisconnected(None).into()),
             Some(_) => Ok(()),
         }
     }
@@ -1617,7 +1620,10 @@ mod tests {
         });
         assert!(reg.connections.contains_key(&key));
         let err = err_rx.try_recv().unwrap();
-        assert!(matches!(err.payload, Error::Io(IoError::PortDisconnected)));
+        assert!(matches!(
+            err.payload,
+            Error::Io(IoError::PortDisconnected(None))
+        ));
     }
 
     #[test]
@@ -1674,7 +1680,7 @@ mod tests {
             .disconnected = true;
         assert!(matches!(
             reg.resolve_output_state(&key),
-            Err(Error::Io(IoError::PortDisconnected))
+            Err(Error::Io(IoError::PortDisconnected(None)))
         ));
     }
 

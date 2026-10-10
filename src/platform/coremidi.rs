@@ -687,7 +687,7 @@ impl Backend {
                         }
                         Command::DestroyVirtualDestination(id) => {
                             if let Some((vdest, senders)) = virtual_destinations.remove(&id.0) {
-                                senders.lifecycle_error(IoError::PortDisconnected);
+                                senders.lifecycle_error(IoError::PortDisconnected(None));
                                 drop(vdest);
                             }
                         }
@@ -841,7 +841,7 @@ fn resolve_output_state<'a>(
 ) -> Result<&'a DestinationConnectionState, Error> {
     let uid = id_to_uid(port_id);
     if disconnected_outputs.lock_unpoisoned().contains(&uid) {
-        return Err(IoError::PortDisconnected.into());
+        return Err(IoError::PortDisconnected(None).into());
     }
     destination_connections
         .get(&uid)
@@ -944,7 +944,7 @@ fn connect_source(
         .push((
             client_id,
             Box::new(move || {
-                disc_senders.lifecycle_error(IoError::PortDisconnected);
+                disc_senders.lifecycle_error(IoError::PortDisconnected(None));
             }),
         ));
 
