@@ -25,8 +25,8 @@ pub enum Error {
 pub enum IoError {
     #[error("port not found")]
     PortNotFound,
-    #[error("port disconnected")]
-    PortDisconnected,
+    #[error("port disconnected{}", detail(.0))]
+    PortDisconnected(#[source] Option<PlatformError>),
     #[error("port already connected")]
     AlreadyConnected,
 
@@ -42,8 +42,12 @@ pub enum IoError {
     #[error("command channel full - backend thread is not processing commands")]
     BackendCommandChannelFull,
 
+    #[error("unique ID taken: {0}")]
+    UniqueIdTaken(#[source] PlatformError),
+    #[error("MIDI access denied: {0}")]
+    PermissionDenied(#[source] PlatformError),
     #[error(transparent)]
-    Platform(#[from] PlatformError),
+    Platform(PlatformError),
 
     #[error("MIDI encoder produced no event")]
     Encode,
@@ -51,8 +55,13 @@ pub enum IoError {
     #[error("inbound stream overflow - {dropped} message(s) dropped")]
     InboundOverflow { dropped: usize },
 
-    #[error("unsupported on this platform")]
-    Unsupported,
+    #[error("unsupported on this platform{}", detail(.0))]
+    Unsupported(#[source] Option<PlatformError>),
+}
+
+#[cfg(feature = "io")]
+fn detail(error: &Option<PlatformError>) -> String {
+    error.as_ref().map(|e| format!(": {e}")).unwrap_or_default()
 }
 
 #[cfg(feature = "io")]
@@ -70,6 +79,52 @@ pub enum PlatformError {
     #[cfg(target_arch = "wasm32")]
     #[error(transparent)]
     Web(#[from] WebError),
+}
+
+#[cfg(feature = "io")]
+impl From<PlatformError> for IoError {
+    fn from(error: PlatformError) -> Self {
+        match &error {
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            PlatformError::CoreMidi(CoreMidiError::IdNotUnique) => Self::UniqueIdTaken(error),
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            PlatformError::CoreMidi(CoreMidiError::NotPermitted) => Self::PermissionDenied(error),
+            #[cfg(target_os = "linux")]
+            PlatformError::Alsa(e) if matches!(e.errno(), libc::EACCES | libc::EPERM) => {
+                Self::PermissionDenied(error)
+            }
+            #[cfg(target_arch = "wasm32")]
+            PlatformError::Web(WebError::NotAllowed(_) | WebError::Security(_)) => {
+                Self::PermissionDenied(error)
+            }
+            #[cfg(target_arch = "wasm32")]
+            PlatformError::Web(WebError::NotSupported(_)) => Self::Unsupported(Some(error)),
+            #[cfg(target_arch = "wasm32")]
+            PlatformError::Web(WebError::InvalidState(_)) => Self::PortDisconnected(Some(error)),
+            _ => Self::Platform(error),
+        }
+    }
+}
+
+#[cfg(all(feature = "io", target_os = "linux"))]
+impl From<alsa::Error> for IoError {
+    fn from(error: alsa::Error) -> Self {
+        PlatformError::from(error).into()
+    }
+}
+
+#[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+impl From<CoreMidiError> for IoError {
+    fn from(error: CoreMidiError) -> Self {
+        PlatformError::from(error).into()
+    }
+}
+
+#[cfg(all(feature = "io", target_arch = "wasm32"))]
+impl From<WebError> for IoError {
+    fn from(error: WebError) -> Self {
+        PlatformError::from(error).into()
+    }
 }
 
 #[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
@@ -233,7 +288,7 @@ mod tests {
         assert_eq!(other, CoreMidiError::Other(-50));
         assert_eq!(format!("{other}"), "OSStatus -50");
 
-        let err: Error = IoError::Platform(known.into()).into();
+        let err: Error = IoError::from(known).into();
         assert!(matches!(
             err,
             Error::Io(IoError::Platform(PlatformError::CoreMidi(
@@ -242,16 +297,55 @@ mod tests {
         ));
     }
 
+    #[cfg(all(feature = "io", any(target_os = "macos", target_os = "ios")))]
+    #[test]
+    fn coremidi_portable_kinds() {
+        let taken = IoError::from(CoreMidiError::from(coremidi_sys::kMIDIIDNotUnique));
+        assert_eq!(format!("{taken}"), "unique ID taken: kMIDIIDNotUnique");
+        assert!(matches!(
+            taken,
+            IoError::UniqueIdTaken(PlatformError::CoreMidi(CoreMidiError::IdNotUnique))
+        ));
+
+        let gone = IoError::PortDisconnected(Some(CoreMidiError::NoConnection.into()));
+        assert_eq!(format!("{gone}"), "port disconnected: kMIDINoConnection");
+        assert_eq!(
+            format!("{}", IoError::PortDisconnected(None)),
+            "port disconnected"
+        );
+
+        let denied = IoError::from(CoreMidiError::from(coremidi_sys::kMIDINotPermitted));
+        assert_eq!(format!("{denied}"), "MIDI access denied: kMIDINotPermitted");
+        assert!(matches!(
+            denied,
+            IoError::PermissionDenied(PlatformError::CoreMidi(CoreMidiError::NotPermitted))
+        ));
+    }
+
     #[cfg(all(feature = "io", target_os = "linux"))]
     #[test]
     fn alsa_error_is_forwarded() {
         let inner = alsa::Error::new("snd_seq_open", libc::ENOENT);
-        let err: Error = IoError::Platform(inner.into()).into();
+        let err: Error = IoError::from(inner).into();
         assert_eq!(format!("{err}"), format!("{inner}"));
         assert!(matches!(
             err,
             Error::Io(IoError::Platform(PlatformError::Alsa(e))) if e == inner
         ));
+    }
+
+    #[cfg(all(feature = "io", target_os = "linux"))]
+    #[test]
+    fn alsa_permission_denied() {
+        for errno in [libc::EACCES, libc::EPERM] {
+            let inner = alsa::Error::new("snd_seq_open", errno);
+            let err = IoError::from(inner);
+            assert_eq!(format!("{err}"), format!("MIDI access denied: {inner}"));
+            assert!(matches!(
+                err,
+                IoError::PermissionDenied(PlatformError::Alsa(e)) if e == inner
+            ));
+        }
     }
 
     #[cfg(feature = "io")]

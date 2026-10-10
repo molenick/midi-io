@@ -194,38 +194,37 @@ impl Backend {
 }
 
 fn init_seq(name: &Name) -> Result<SeqContext, Error> {
-    let seq = Seq::open(None, None, true).map_err(|e| IoError::Platform(e.into()))?;
+    let seq = Seq::open(None, None, true).map_err(IoError::from)?;
     seq.set_client_name(name.as_c_str())
-        .map_err(|e| IoError::Platform(e.into()))?;
+        .map_err(IoError::from)?;
     let our_port = seq
         .create_simple_port(
             c"midi-io-input",
             PortCap::WRITE | PortCap::SUBS_WRITE,
             PortType::APPLICATION,
         )
-        .map_err(|e| IoError::Platform(e.into()))?;
+        .map_err(IoError::from)?;
     let our_send_port = seq
         .create_simple_port(
             c"midi-io-output",
             PortCap::READ | PortCap::SUBS_READ,
             PortType::APPLICATION,
         )
-        .map_err(|e| IoError::Platform(e.into()))?;
-    let our_client = seq.client_id().map_err(|e| IoError::Platform(e.into()))?;
+        .map_err(IoError::from)?;
+    let our_client = seq.client_id().map_err(IoError::from)?;
     let queue_id = seq
         .alloc_named_queue(c"midi-io-ts")
-        .map_err(|e| IoError::Platform(e.into()))?;
+        .map_err(IoError::from)?;
     seq.control_queue(queue_id, EventType::Start, 0, None::<&mut alsa::seq::Event>)
-        .map_err(|e| IoError::Platform(e.into()))?;
+        .map_err(IoError::from)?;
     let queue_start_instant = Instant::now();
-    let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
+    let sub = PortSubscribe::empty().map_err(IoError::from)?;
     sub.set_sender(Addr::system_announce());
     sub.set_dest(Addr {
         client: our_client,
         port: our_port,
     });
-    seq.subscribe_port(&sub)
-        .map_err(|e| IoError::Platform(e.into()))?;
+    seq.subscribe_port(&sub).map_err(IoError::from)?;
     Ok(SeqContext {
         seq,
         our_client,
@@ -327,7 +326,8 @@ impl PortRegistry {
     fn remove_source(&mut self, key: AlsaPortKey) {
         if let Some(port) = self.source_cache.remove(&key) {
             if let Some(conn) = self.connections.get(&key) {
-                conn.senders.lifecycle_error(IoError::PortDisconnected);
+                conn.senders
+                    .lifecycle_error(IoError::PortDisconnected(None));
             }
             notify_subscribers(&self.source_subs, SourceChange::Removed(port));
         }
@@ -492,7 +492,7 @@ impl PortRegistry {
                             let _ = reply.send(Ok(port));
                         }
                         Err(e) => {
-                            let _ = reply.send(Err(Error::from(IoError::Platform(e.into()))));
+                            let _ = reply.send(Err(Error::from(IoError::from(e))));
                         }
                     }
                 }
@@ -509,7 +509,7 @@ impl PortRegistry {
                     reply,
                     ..
                 } => {
-                    let _ = reply.send(Err(IoError::Unsupported.into()));
+                    let _ = reply.send(Err(IoError::Unsupported(None).into()));
                 }
                 Command::CreateVirtualDestination {
                     id,
@@ -534,7 +534,7 @@ impl PortRegistry {
                         let _ = reply.send(Ok((port, receivers)));
                     }
                     Err(e) => {
-                        let _ = reply.send(Err(Error::from(IoError::Platform(e.into()))));
+                        let _ = reply.send(Err(Error::from(IoError::from(e))));
                     }
                 },
                 Command::SendVirtualMidi { id, msg, reply } => {
@@ -554,7 +554,9 @@ impl PortRegistry {
                 Command::DestroyVirtualDestination(id) => {
                     if let Some(alsa_port) = self.vdest_ports.remove(&id.0) {
                         if let Some(state) = self.vdest_recv.remove(&alsa_port) {
-                            state.senders.lifecycle_error(IoError::PortDisconnected);
+                            state
+                                .senders
+                                .lifecycle_error(IoError::PortDisconnected(None));
                         }
                         self.remove_destination(AlsaPortKey(ctx.our_client, alsa_port));
                         let _ = ctx.seq.delete_port(alsa_port);
@@ -717,7 +719,7 @@ impl PortRegistry {
     fn resolve_output_state(&self, key: &AlsaPortKey) -> Result<(), Error> {
         match self.destination_connections.get(key) {
             None => Err(IoError::PortNotFound.into()),
-            Some(conn) if conn.disconnected => Err(IoError::PortDisconnected.into()),
+            Some(conn) if conn.disconnected => Err(IoError::PortDisconnected(None).into()),
             Some(_) => Ok(()),
         }
     }
@@ -744,7 +746,7 @@ impl PortRegistry {
             return Err(IoError::PortNotFound.into());
         }
 
-        let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
+        let sub = PortSubscribe::empty().map_err(IoError::from)?;
         sub.set_sender(Addr {
             client: key.0,
             port: key.1,
@@ -756,9 +758,7 @@ impl PortRegistry {
         sub.set_queue(ctx.queue_id);
         sub.set_time_update(true);
         sub.set_time_real(true);
-        ctx.seq
-            .subscribe_port(&sub)
-            .map_err(|e| IoError::Platform(e.into()))?;
+        ctx.seq.subscribe_port(&sub).map_err(IoError::from)?;
 
         let (senders, receivers) = StreamSenders::channel();
         self.connections.insert(
@@ -773,7 +773,7 @@ impl PortRegistry {
 }
 
 fn subscribe_destination(ctx: &SeqContext, key: AlsaPortKey) -> Result<(), Error> {
-    let sub = PortSubscribe::empty().map_err(|e| IoError::Platform(e.into()))?;
+    let sub = PortSubscribe::empty().map_err(IoError::from)?;
     sub.set_sender(Addr {
         client: ctx.our_client,
         port: ctx.our_send_port,
@@ -782,9 +782,7 @@ fn subscribe_destination(ctx: &SeqContext, key: AlsaPortKey) -> Result<(), Error
         client: key.0,
         port: key.1,
     });
-    ctx.seq
-        .subscribe_port(&sub)
-        .map_err(|e| IoError::Platform(e.into()))?;
+    ctx.seq.subscribe_port(&sub).map_err(IoError::from)?;
     Ok(())
 }
 
@@ -810,13 +808,12 @@ fn send_encoded(
     dest: Addr,
 ) -> Result<(), Error> {
     coder.reset_encode();
-    let (_, maybe_ev) = coder.encode(msg).map_err(|e| IoError::Platform(e.into()))?;
+    let (_, maybe_ev) = coder.encode(msg).map_err(IoError::from)?;
     let mut ev = maybe_ev.ok_or(IoError::Encode)?;
     ev.set_source(source);
     ev.set_dest(dest);
     ev.set_direct();
-    seq.event_output_direct(&mut ev)
-        .map_err(|e| IoError::Platform(e.into()))?;
+    seq.event_output_direct(&mut ev).map_err(IoError::from)?;
     Ok(())
 }
 
@@ -826,8 +823,7 @@ fn send_sysex_event(seq: &Seq, data: Vec<u8>, source: i32, dest: Addr) -> Result
     ev.set_dest(dest);
     let mut ev = ev.into_owned();
     ev.set_direct();
-    seq.event_output_direct(&mut ev)
-        .map_err(|e| IoError::Platform(e.into()))?;
+    seq.event_output_direct(&mut ev).map_err(IoError::from)?;
     Ok(())
 }
 
@@ -872,7 +868,7 @@ fn run_thread(
     let send_coder = match MidiEvent::new(4) {
         Ok(v) => v,
         Err(e) => {
-            let _ = ready_tx.send(Err(Error::from(IoError::Platform(e.into()))));
+            let _ = ready_tx.send(Err(Error::from(IoError::from(e))));
             return;
         }
     };
@@ -884,7 +880,7 @@ fn run_thread(
     let alsa_pfds = match (&ctx.seq, Some(Direction::Capture)).get() {
         Ok(p) => p,
         Err(e) => {
-            let _ = ready_tx.send(Err(Error::from(IoError::Platform(e.into()))));
+            let _ = ready_tx.send(Err(Error::from(IoError::from(e))));
             return;
         }
     };
@@ -1624,7 +1620,10 @@ mod tests {
         });
         assert!(reg.connections.contains_key(&key));
         let err = err_rx.try_recv().unwrap();
-        assert!(matches!(err.payload, Error::Io(IoError::PortDisconnected)));
+        assert!(matches!(
+            err.payload,
+            Error::Io(IoError::PortDisconnected(None))
+        ));
     }
 
     #[test]
@@ -1681,7 +1680,7 @@ mod tests {
             .disconnected = true;
         assert!(matches!(
             reg.resolve_output_state(&key),
-            Err(Error::Io(IoError::PortDisconnected))
+            Err(Error::Io(IoError::PortDisconnected(None)))
         ));
     }
 

@@ -169,7 +169,7 @@ impl WebState {
 
     fn send(&self, port_id: PortId, data: &[u8]) -> Result<(), Error> {
         let Some(output) = self.destinations.get(&port_id.0) else {
-            return Err(IoError::PortDisconnected.into());
+            return Err(IoError::PortDisconnected(None).into());
         };
         let array = js_sys::Uint8Array::from(data);
         output
@@ -249,7 +249,7 @@ impl Backend {
 }
 
 async fn request_access() -> Result<MidiAccess, Error> {
-    let window = web_sys::window().ok_or(IoError::Unsupported)?;
+    let window = web_sys::window().ok_or(IoError::Unsupported(None))?;
     let options = MidiOptions::new();
     options.set_sysex(true);
     let promise = window
@@ -261,7 +261,7 @@ async fn request_access() -> Result<MidiAccess, Error> {
 }
 
 fn map_web_error(value: JsValue) -> IoError {
-    IoError::Platform(WebError::from(value).into())
+    WebError::from(value).into()
 }
 
 fn connect_destination(
@@ -406,16 +406,16 @@ fn process(state: &Rc<RefCell<WebState>>, cmd: Command) {
             let _ = reply.send(result);
         }
         Command::CreateVirtualSource { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+            let _ = reply.send(Err(IoError::Unsupported(None).into()));
         }
         Command::CreateVirtualDestination { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+            let _ = reply.send(Err(IoError::Unsupported(None).into()));
         }
         Command::SendVirtualMidi { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+            let _ = reply.send(Err(IoError::Unsupported(None).into()));
         }
         Command::SendVirtualSysex { reply, .. } => {
-            let _ = reply.send(Err(IoError::Unsupported.into()));
+            let _ = reply.send(Err(IoError::Unsupported(None).into()));
         }
         Command::DisconnectDestination(port_id) => {
             state.borrow_mut().disconnect_destination(port_id);
