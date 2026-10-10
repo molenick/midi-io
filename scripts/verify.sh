@@ -37,6 +37,7 @@ full_matrix() {
     run cargo +nightly fmt --check
     run deny_check
     run cargo clippy --all-targets -- -D warnings
+    run cargo clippy --all-targets --no-default-features -- -D warnings
     run cargo test -- --include-ignored
     run cargo clippy --target aarch64-apple-ios-sim --all-targets -- -D warnings
     run bash "$DC_DIR/test-ios.sh"

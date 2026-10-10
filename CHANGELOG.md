@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `IoError::UniqueIdTaken` and `IoError::PermissionDenied` return on every platform and carry the backend's `PlatformError`, so callers match them without `cfg`; CoreMIDI `kMIDIIDNotUnique` lifts to `UniqueIdTaken`; CoreMIDI `kMIDINotPermitted`, ALSA `EACCES`/`EPERM` and Web `NotAllowedError`/`SecurityError` lift to `PermissionDenied`; `Unsupported` and `PortDisconnected` take an `Option<PlatformError>`, and Web `NotSupportedError` and `InvalidStateError` lift to them
 - The ALSA destination subscription test asks the sequencer for subscribers instead of reading `/proc/asound/seq/clients`, which `container` 1.5.0 hides
+- CI and `verify.sh` run clippy with `--no-default-features`; the e2e tests require the `io` feature; `ORPHAN_PREFIX_BYTES` builds only where it is used
 
 ## 0.3.0
 

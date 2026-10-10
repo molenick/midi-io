@@ -122,3 +122,19 @@ required-features = ["io"]
 
 [[example]]
 name = "web_synth"
+
+[[test]]
+name = "connect_e2e"
+required-features = ["io"]
+
+[[test]]
+name = "destination_subscribe_e2e"
+required-features = ["io"]
+
+[[test]]
+name = "hotplug_e2e"
+required-features = ["io"]
+
+[[test]]
+name = "virtual_id_e2e"
+required-features = ["io"]
