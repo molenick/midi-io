@@ -81,7 +81,7 @@ async fn a_unique_id_held_by_another_endpoint_is_refused() {
     assert!(
         matches!(
             err,
-            Error::Io(IoError::Platform(PlatformError::CoreMidi(
+            Error::Io(IoError::UniqueIdTaken(PlatformError::CoreMidi(
                 CoreMidiError::IdNotUnique
             )))
         ),

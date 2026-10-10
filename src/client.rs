@@ -107,9 +107,7 @@ impl Client {
     /// launch. Passing the ID the port had last time keeps it the same port.
     /// The returned destination's [`PortId::to_bits`] equals `unique_id`.
     ///
-    /// Fails with [`CoreMidiError::IdNotUnique`] when another endpoint holds the ID.
-    ///
-    /// [`CoreMidiError::IdNotUnique`]: crate::CoreMidiError::IdNotUnique
+    /// Fails with [`IoError::UniqueIdTaken`] when another endpoint holds the ID.
     /// Only CoreMIDI can choose an ID; other backends return
     /// [`IoError::Unsupported`].
     ///

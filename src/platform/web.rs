@@ -261,7 +261,7 @@ async fn request_access() -> Result<MidiAccess, Error> {
 }
 
 fn map_web_error(value: JsValue) -> IoError {
-    IoError::Platform(WebError::from(value).into())
+    WebError::from(value).into()
 }
 
 fn connect_destination(
