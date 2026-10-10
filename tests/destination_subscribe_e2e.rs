@@ -6,16 +6,14 @@ use alsa::seq::QuerySubsType;
 use alsa::seq::Seq;
 use midi_io::Client;
 
-fn connected_from(client: i32, port: i32) -> bool {
-    let seq = Seq::open(None, None, false).unwrap();
-    PortSubscribeIter::new(&seq, Addr { client, port }, QuerySubsType::WRITE)
-        .next()
-        .is_some()
+fn connected_from(seq: &Seq, client: i32, port: i32) -> bool {
+    PortSubscribeIter::new(seq, Addr { client, port }, QuerySubsType::WRITE)
+        .any(|sub| sub.get_sender().client == client)
 }
 
-async fn settles_to(client: i32, port: i32, wanted: bool) -> bool {
+async fn settles_to(seq: &Seq, client: i32, port: i32, wanted: bool) -> bool {
     for _ in 0..100 {
-        if connected_from(client, port) == wanted {
+        if connected_from(seq, client, port) == wanted {
             return true;
         }
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -34,21 +32,22 @@ async fn connecting_a_destination_subscribes_the_output_port() {
     let destination = virtual_destination.as_destination();
     let bits = destination.id().to_bits();
     let (seq_client, seq_port) = ((bits >> 32) as u32 as i32, bits as u32 as i32);
+    let seq = Seq::open(None, None, false).unwrap();
 
     assert!(
-        !connected_from(seq_client, seq_port),
+        !connected_from(&seq, seq_client, seq_port),
         "the destination must start with no write subscription"
     );
 
     let connection = client.connect_destination(&destination).await.unwrap();
     assert!(
-        connected_from(seq_client, seq_port),
+        connected_from(&seq, seq_client, seq_port),
         "connecting must subscribe our output port to the destination"
     );
 
     drop(connection);
     assert!(
-        settles_to(seq_client, seq_port, false).await,
+        settles_to(&seq, seq_client, seq_port, false).await,
         "disconnecting must drop the subscription"
     );
 }
