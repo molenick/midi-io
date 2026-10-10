@@ -1,31 +1,16 @@
 #![cfg(target_os = "linux")]
 
+use alsa::seq::Addr;
+use alsa::seq::PortSubscribeIter;
+use alsa::seq::QuerySubsType;
+use alsa::seq::Seq;
 use midi_io::Client;
 
 fn connected_from(client: i32, port: i32) -> bool {
-    let clients =
-        std::fs::read_to_string("/proc/asound/seq/clients").expect("read /proc/asound/seq/clients");
-    let mut seen_client = None;
-    let mut here = false;
-    for line in clients.lines() {
-        if let Some(n) = line.strip_prefix("Client ").and_then(number_before_colon) {
-            seen_client = Some(n);
-            here = false;
-        } else if let Some(n) = line
-            .trim_start()
-            .strip_prefix("Port ")
-            .and_then(number_before_colon)
-        {
-            here = seen_client == Some(client) && n == port;
-        } else if here && line.trim_start().starts_with("Connected From:") {
-            return true;
-        }
-    }
-    false
-}
-
-fn number_before_colon(rest: &str) -> Option<i32> {
-    rest.split(':').next()?.trim().parse().ok()
+    let seq = Seq::open(None, None, false).unwrap();
+    PortSubscribeIter::new(&seq, Addr { client, port }, QuerySubsType::WRITE)
+        .next()
+        .is_some()
 }
 
 async fn settles_to(client: i32, port: i32, wanted: bool) -> bool {
