@@ -1,36 +1,19 @@
 #![cfg(target_os = "linux")]
 
+use alsa::seq::Addr;
+use alsa::seq::PortSubscribeIter;
+use alsa::seq::QuerySubsType;
+use alsa::seq::Seq;
 use midi_io::Client;
 
-fn connected_from(client: i32, port: i32) -> bool {
-    let clients =
-        std::fs::read_to_string("/proc/asound/seq/clients").expect("read /proc/asound/seq/clients");
-    let mut seen_client = None;
-    let mut here = false;
-    for line in clients.lines() {
-        if let Some(n) = line.strip_prefix("Client ").and_then(number_before_colon) {
-            seen_client = Some(n);
-            here = false;
-        } else if let Some(n) = line
-            .trim_start()
-            .strip_prefix("Port ")
-            .and_then(number_before_colon)
-        {
-            here = seen_client == Some(client) && n == port;
-        } else if here && line.trim_start().starts_with("Connected From:") {
-            return true;
-        }
-    }
-    false
+fn connected_from(seq: &Seq, client: i32, port: i32) -> bool {
+    PortSubscribeIter::new(seq, Addr { client, port }, QuerySubsType::WRITE)
+        .any(|sub| sub.get_sender().client == client)
 }
 
-fn number_before_colon(rest: &str) -> Option<i32> {
-    rest.split(':').next()?.trim().parse().ok()
-}
-
-async fn settles_to(client: i32, port: i32, wanted: bool) -> bool {
+async fn settles_to(seq: &Seq, client: i32, port: i32, wanted: bool) -> bool {
     for _ in 0..100 {
-        if connected_from(client, port) == wanted {
+        if connected_from(seq, client, port) == wanted {
             return true;
         }
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -49,21 +32,22 @@ async fn connecting_a_destination_subscribes_the_output_port() {
     let destination = virtual_destination.as_destination();
     let bits = destination.id().to_bits();
     let (seq_client, seq_port) = ((bits >> 32) as u32 as i32, bits as u32 as i32);
+    let seq = Seq::open(None, None, false).unwrap();
 
     assert!(
-        !connected_from(seq_client, seq_port),
+        !connected_from(&seq, seq_client, seq_port),
         "the destination must start with no write subscription"
     );
 
     let connection = client.connect_destination(&destination).await.unwrap();
     assert!(
-        connected_from(seq_client, seq_port),
+        connected_from(&seq, seq_client, seq_port),
         "connecting must subscribe our output port to the destination"
     );
 
     drop(connection);
     assert!(
-        settles_to(seq_client, seq_port, false).await,
+        settles_to(&seq, seq_client, seq_port, false).await,
         "disconnecting must drop the subscription"
     );
 }
