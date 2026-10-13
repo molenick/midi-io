@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Minimum supported Rust version is 1.82
+
 ## 0.4.0
 
 - `IoError::UniqueIdTaken` and `IoError::PermissionDenied` return on every platform and carry the backend's `PlatformError`, so callers match them without `cfg`; CoreMIDI `kMIDIIDNotUnique` lifts to `UniqueIdTaken`; CoreMIDI `kMIDINotPermitted`, ALSA `EACCES`/`EPERM` and Web `NotAllowedError`/`SecurityError` lift to `PermissionDenied`; `Unsupported` and `PortDisconnected` take an `Option<PlatformError>`, and Web `NotSupportedError` and `InvalidStateError` lift to them (https://github.com/molenick/midi-io/pull/22)

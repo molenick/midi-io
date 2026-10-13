@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn parse_rejects_oversized_sysex() {
         let mut bytes = vec![0xF0u8];
-        bytes.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 1));
+        bytes.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 1));
         bytes.push(0xF7);
         assert!(matches!(
             decode(&bytes),
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn parse_accepts_max_sized_sysex() {
         let mut bytes = vec![0xF0u8];
-        bytes.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES));
+        bytes.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES));
         bytes.push(0xF7);
         assert!(matches!(decode(&bytes), Ok(Decoded::SysEx(_))));
     }
