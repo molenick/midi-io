@@ -717,7 +717,7 @@ mod tests {
         let mut msgs = Vec::new();
 
         let mut overflow = vec![0xF0u8];
-        overflow.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 1));
+        overflow.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 1));
         parser.push(&overflow, &mut |m| match m {
             DecodedEvent::Sysex(_) => panic!("unexpected sysex"),
             DecodedEvent::Error(crate::Error::Codec(CodecError::SysexTooLong { max, .. })) => {
@@ -753,7 +753,7 @@ mod tests {
         let mut sys = Vec::new();
 
         let mut bytes = vec![0xF0u8];
-        bytes.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 50));
+        bytes.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 50));
         bytes.push(0xF7);
         bytes.extend([0x90, 60, 100]);
         let mut sink = |m: DecodedEvent| match m {
@@ -787,7 +787,7 @@ mod tests {
         let mut sys = Vec::new();
 
         let mut bytes = vec![0xF0u8];
-        bytes.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 50));
+        bytes.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 50));
         bytes.extend([0xF0, 0x41, 0x10, 0xF7]);
         parser.push(&bytes, &mut |m| match m {
             DecodedEvent::Sysex(s) => sys.push(s),

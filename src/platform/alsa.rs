@@ -1428,7 +1428,7 @@ mod tests {
     fn sysex_oversized_multichunk_single_error_then_recovers() {
         let (mut conn, (_msg_rx, mut sysex_rx, mut err_rx)) = make_conn();
         let big: Vec<u8> = std::iter::once(0xF0)
-            .chain(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES))
+            .chain(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES))
             .collect();
         handle_sysex_data(&big, &mut conn, Instant::now());
         assert!(err_rx.try_recv().is_err());
@@ -1477,7 +1477,7 @@ mod tests {
     fn sysex_max_size_body_accepted() {
         let (mut conn, (_msg_rx, mut sysex_rx, mut err_rx)) = make_conn();
         let big: Vec<u8> = std::iter::once(0xF0)
-            .chain(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES))
+            .chain(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES))
             .chain(std::iter::once(0xF7))
             .collect();
         handle_sysex_data(&big, &mut conn, Instant::now());
@@ -1490,7 +1490,7 @@ mod tests {
     fn sysex_oversized_clears_buffer() {
         let (mut conn, (_msg_rx, _sysex_rx, mut err_rx)) = make_conn();
         let big: Vec<u8> = std::iter::once(0xF0)
-            .chain(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 1))
+            .chain(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 1))
             .chain(std::iter::once(0xF7))
             .collect();
         handle_sysex_data(&big, &mut conn, Instant::now());

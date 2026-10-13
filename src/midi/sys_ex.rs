@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn sysex_try_from_rejects_oversized_body() {
         let mut wire = vec![0xF0u8];
-        wire.extend(std::iter::repeat(0x01).take(MAX_SYSEX_BYTES + 1));
+        wire.extend(std::iter::repeat_n(0x01, MAX_SYSEX_BYTES + 1));
         wire.push(0xF7);
         assert_eq!(
             SysEx::try_from(wire.as_slice()),
