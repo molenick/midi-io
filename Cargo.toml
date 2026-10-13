@@ -57,7 +57,7 @@ coremidi-sys = { version = "3", optional = true }
 core-foundation = { version = "0.10", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-alsa = { version = "0.10", optional = true }
+alsa = { version = "0.11", optional = true }
 libc = { version = "0.2", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
