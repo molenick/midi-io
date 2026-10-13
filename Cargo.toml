@@ -7,7 +7,7 @@ repository = "https://github.com/molenick/midi-io"
 keywords = ["midi", "audio", "async", "coremidi", "alsa"]
 categories = ["multimedia::audio", "asynchronous"]
 license = "MIT OR Apache-2.0"
-rust-version = "1.78"
+rust-version = "1.82"
 include = [
   "src/**/*.rs",
   "examples/*.rs",

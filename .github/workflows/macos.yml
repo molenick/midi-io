@@ -21,9 +21,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup toolchain install 1.78 --profile minimal
-      - run: cargo +1.78 build
-      - run: cargo +1.78 build --no-default-features
+      - run: rustup toolchain install 1.82 --profile minimal
+      - run: cargo +1.82 build
+      - run: cargo +1.82 build --no-default-features
 
   ios:
     runs-on: macos-latest
