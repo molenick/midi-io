@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.5.0
 
-- Minimum supported Rust version is 1.82
+- Minimum supported Rust version is 1.82 (https://github.com/molenick/midi-io/pull/27)
+- Update `alsa` to 0.11 (https://github.com/molenick/midi-io/pull/26)
 
 ## 0.4.0
 
