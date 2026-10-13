@@ -53,7 +53,7 @@ cargo add midi-io
 ```
 
 For codec-only use, disable default features:
-`midi-io = { version = "0.4", default-features = false }`.
+`midi-io = { version = "0.5", default-features = false }`.
 
 MSRV 1.82. Tests and examples need Rust 1.86.
 
